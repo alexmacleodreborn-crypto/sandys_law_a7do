@@ -1,0 +1,77 @@
+# -----------------------------
+# Python
+# -----------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+
+# -----------------------------
+# Virtual environments
+# -----------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# -----------------------------
+# IDE / Editor
+# -----------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+
+# -----------------------------
+# OS
+# -----------------------------
+.DS_Store
+Thumbs.db
+
+# -----------------------------
+# Data / Runtime artifacts
+# -----------------------------
+data/memory/*.db
+data/memory/*.db-wal
+data/memory/*.db-shm
+data/logs/
+data/embodiment/*.json
+
+# -----------------------------
+# Streamlit
+# -----------------------------
+.streamlit/
+*.streamlit.log
+
+# -----------------------------
+# Testing / Coverage
+# -----------------------------
+.coverage
+htmlcov/
+.pytest_cache/
+
+# -----------------------------
+# Temporary exports
+# -----------------------------
+*.csv
+*.tsv
+*.log
+*.tmp
+
+# -----------------------------
+# Notebooks
+# -----------------------------
+.ipynb_checkpoints/
+
+# -----------------------------
+# Optional local overrides
+# -----------------------------
+.env
+.env.local
