@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560">
+  <rect width="1200" height="560" fill="white"/>
+  <text x="60" y="60" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700">
+    Canonical Gate Chain (Connections, Not Rules)
+  </text>
+  <text x="60" y="95" font-family="Arial, Helvetica, sans-serif" font-size="18">
+    If a gate is closed, information cannot propagate. Safety is structural.
+  </text>
+
+  <g font-family="Arial, Helvetica, sans-serif" stroke="#222" stroke-width="2">
+    <!-- Nodes -->
+    <rect x="80" y="140" width="220" height="70" rx="14" fill="#f6f6f6"/>
+    <text x="105" y="183" font-size="22" font-weight="700">World</text>
+
+    <rect x="340" y="140" width="260" height="70" rx="14" fill="#ffffff"/>
+    <text x="365" y="170" font-size="18" font-weight="700">PerceptionGate</text>
+    <text x="365" y="197" font-size="14">World → Percepts</text>
+
+    <rect x="640" y="140" width="200" height="70" rx="14" fill="#f6f6f6"/>
+    <text x="665" y="183" font-size="22" font-weight="700">Mind</text>
+
+    <rect x="880" y="140" width="260" height="70" rx="14" fill="#ffffff"/>
+    <text x="905" y="170" font-size="18" font-weight="700">FrameGate</text>
+    <text x="905" y="197" font-size="14">Close frames</text>
+
+    <rect x="140" y="260" width="320" height="70" rx="14" fill="#ffffff"/>
+    <text x="165" y="290" font-size="18" font-weight="700">Accountant</text>
+    <text x="165" y="317" font-size="14">Frame → Aᵢ summary</text>
+
+    <rect x="520" y="260" width="260" height="70" rx="14" fill="#ffffff"/>
+    <text x="545" y="290" font-size="18" font-weight="700">MemoryGate</text>
+    <text x="545" y="317" font-size="14">Aᵢ only</text>
+
+    <rect x="820" y="260" width="260" height="70" rx="14" fill="#f6f6f6"/>
+    <text x="845" y="290" font-size="18" font-weight="700">Memory</text>
+    <text x="845" y="317" font-size="14">Traces → Clusters</text>
+
+    <rect x="140" y="380" width="360" height="70" rx="14" fill="#ffffff"/>
+    <text x="165" y="410" font-size="18" font-weight="700">ConsolidationGate</text>
+    <text x="165" y="437" font-size="14">Stable + Local + Non-contradictory</text>
+
+    <rect x="560" y="380" width="320" height="70" rx="14" fill="#f6f6f6"/>
+    <text x="585" y="422" font-size="18" font-weight="700">Embodiment Ledger</text>
+
+    <rect x="920" y="380" width="220" height="70" rx="14" fill="#ffffff"/>
+    <text x="945" y="410" font-size="18" font-weight="700">ExpectationGate</text>
+    <text x="945" y="437" font-size="14">Ledger → bias</text>
+
+    <!-- Arrows -->
+    <path d="M300 175 L340 175" fill="none"/>
+    <path d="M600 175 L640 175" fill="none"/>
+    <path d="M840 175 L880 175" fill="none"/>
+
+    <path d="M1010 210 L320 260" fill="none"/>
+    <path d="M460 295 L520 295" fill="none"/>
+    <path d="M780 295 L820 295" fill="none"/>
+
+    <path d="M950 330 L320 380" fill="none"/>
+    <path d="M500 415 L560 415" fill="none"/>
+    <path d="M880 415 L920 415" fill="none"/>
+    <path d="M1030 450 L740 210" fill="none"/>
+
+    <!-- Arrowheads (simple triangles) -->
+    <path d="M332 169 L340 175 L332 181" fill="none"/>
+    <path d="M632 169 L640 175 L632 181" fill="none"/>
+    <path d="M872 169 L880 175 L872 181" fill="none"/>
+    <path d="M512 289 L520 295 L512 301" fill="none"/>
+    <path d="M812 289 L820 295 L812 301" fill="none"/>
+    <path d="M552 409 L560 415 L552 421" fill="none"/>
+    <path d="M912 409 L920 415 L912 421" fill="none"/>
+  </g>
+
+  <text x="60" y="525" font-family="Arial, Helvetica, sans-serif" font-size="16">
+    Doctrine: no direct memory→world, no education before embodiment, no time axis anywhere.
+  </text>
+</svg>

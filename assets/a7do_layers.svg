@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <rect width="1200" height="720" fill="white"/>
+  <text x="60" y="60" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700">
+    A7DO Structure (No Time • Frames • Gates)
+  </text>
+  <text x="60" y="96" font-family="Arial, Helvetica, sans-serif" font-size="18">
+    Layers are irreversible: no layer writes downward. Gates are couplings, not rules.
+  </text>
+
+  <!-- Layer boxes -->
+  <g font-family="Arial, Helvetica, sans-serif">
+    <g>
+      <rect x="110" y="140" width="980" height="52" rx="14" fill="#f6f6f6" stroke="#222"/>
+      <text x="140" y="173" font-size="22" font-weight="700">Roles / Interfaces</text>
+      <text x="520" y="173" font-size="16">Bounded access to external systems (e.g., SLED)</text>
+    </g>
+    <g>
+      <rect x="110" y="208" width="980" height="52" rx="14" fill="#ffffff" stroke="#222"/>
+      <text x="140" y="241" font-size="22" font-weight="700">Education</text>
+      <text x="520" y="241" font-size="16">Curricula, exams, CV — only after stability</text>
+    </g>
+    <g>
+      <rect x="110" y="276" width="980" height="52" rx="14" fill="#f6f6f6" stroke="#222"/>
+      <text x="140" y="309" font-size="22" font-weight="700">Mind</text>
+      <text x="520" y="309" font-size="16">Integration, regulation, preference (non-reward)</text>
+    </g>
+    <g>
+      <rect x="110" y="344" width="980" height="52" rx="14" fill="#ffffff" stroke="#222"/>
+      <text x="140" y="377" font-size="22" font-weight="700">Scuttling</text>
+      <text x="520" y="377" font-size="16">Body skill emergence via local resolution</text>
+    </g>
+    <g>
+      <rect x="110" y="412" width="980" height="52" rx="14" fill="#f6f6f6" stroke="#222"/>
+      <text x="140" y="445" font-size="22" font-weight="700">Embodiment (Ledger)</text>
+      <text x="520" y="445" font-size="16">Grounded invariants (boundaries, thermal, pain, ownership)</text>
+    </g>
+    <g>
+      <rect x="110" y="480" width="980" height="52" rx="14" fill="#ffffff" stroke="#222"/>
+      <text x="140" y="513" font-size="22" font-weight="700">Memory</text>
+      <text x="520" y="513" font-size="16">Traces → clusters → candidates (no beliefs)</text>
+    </g>
+    <g>
+      <rect x="110" y="548" width="980" height="52" rx="14" fill="#f6f6f6" stroke="#222"/>
+      <text x="140" y="581" font-size="22" font-weight="700">Accounting</text>
+      <text x="520" y="581" font-size="16">Frame summaries: coherence, error, flux, fragmentation</text>
+    </g>
+    <g>
+      <rect x="110" y="616" width="980" height="52" rx="14" fill="#ffffff" stroke="#222"/>
+      <text x="140" y="649" font-size="22" font-weight="700">Frames + World</text>
+      <text x="520" y="649" font-size="16">Events ordered by sequence; frames open/close on information</text>
+    </g>
+  </g>
+
+  <!-- Down arrows (allowed flow) -->
+  <g stroke="#222" stroke-width="3" fill="none">
+    <path d="M600 194 L600 206"/>
+    <path d="M600 262 L600 274"/>
+    <path d="M600 330 L600 342"/>
+    <path d="M600 398 L600 410"/>
+    <path d="M600 466 L600 478"/>
+    <path d="M600 534 L600 546"/>
+    <path d="M600 602 L600 614"/>
+    <path d="M594 206 L600 214 L606 206"/>
+    <path d="M594 274 L600 282 L606 274"/>
+    <path d="M594 342 L600 350 L606 342"/>
+    <path d="M594 410 L600 418 L606 410"/>
+    <path d="M594 478 L600 486 L606 478"/>
+    <path d="M594 546 L600 554 L606 546"/>
+    <path d="M594 614 L600 622 L606 614"/>
+  </g>
+
+  <!-- Note: no upward arrows -->
+  <text x="60" y="700" font-family="Arial, Helvetica, sans-serif" font-size="16">
+    Doctrine: no downward writes • no time axis • safety via missing connections (gates).
+  </text>
+</svg>
