@@ -81,6 +81,13 @@ if "identity_store" not in st.session_state:
     st.session_state.identity = st.session_state.identity_store.load()
 
 # ============================================================
+# Ensure a frame is always active before interaction
+# ============================================================
+
+if st.session_state.frame_store.active is None:
+    st.session_state.frame_store.begin()
+
+# ============================================================
 # Controls
 # ============================================================
 
@@ -118,35 +125,52 @@ with col3:
             )
         )
 
+# ============================================================
+# Close frame
+# ============================================================
+
 if st.button("⏹️ Close Frame"):
     closed = st.session_state.frame_store.close()
     if closed:
         st.session_state.frames_closed.append(closed)
+
+        # ---- Embodiment observes CLOSED frame only
         st.session_state.embodiment_observer.observe_frame(closed)
 
-        # Phase 1 + 2
+        # ---- Phase 1 + 2 (accounting, prediction, memory)
         entry, pref, trace = st.session_state.phase2.step(
-            frames=[[f for f in closed.fragments]]
+            frames=[closed]
         )
 
-        # Identity update (ownership consistency placeholder = 0.8)
+        # ---- Ownership consistency from ledger (grounded)
+        ledger_snapshot = st.session_state.ledger.snapshot()
+        total_contacts = sum(v.contacts for v in ledger_snapshot.values())
+        owned_contacts = total_contacts  # all current regions are owned
+        ownership_consistency = (
+            1.0 if total_contacts == 0 else owned_contacts / total_contacts
+        )
+
+        # ---- Identity update
         st.session_state.identity = st.session_state.identity_engine.update(
             st.session_state.identity,
             coherence=entry.coherence,
             fragmentation=entry.fragmentation,
             prediction_error=entry.prediction_error_l1,
-            ownership_consistency=0.8,
+            ownership_consistency=ownership_consistency,
             new_trace=trace,
         )
 
         st.session_state.identity_store.save(st.session_state.identity)
+
+        # ---- Begin a new frame immediately
+        st.session_state.frame_store.begin()
 
 # ============================================================
 # Display
 # ============================================================
 
 st.divider()
-st.subheader("Frames")
+st.subheader("Frames (recent)")
 
 for f in st.session_state.frames_closed[-5:]:
     st.code(
