@@ -1,194 +1,192 @@
 from __future__ import annotations
 
 import streamlit as st
-from typing import List
+import pandas as pd
 
-# ------------------------------------------------------------
-# World (Phase 0)
-# ------------------------------------------------------------
+# ============================================================
+# Core imports
+# ============================================================
 
-from world.world_state import make_default_world, WorldEvent
-from world.actuators import ActuatorSuite, ActionIntent
-from world.sensors import SensorSuite
+from frames import FrameStore
+from frames.fragment import Fragment
 
-# ------------------------------------------------------------
-# Phase 1 Integration
-# ------------------------------------------------------------
+from embodiment.boundaries import BoundaryMap, Boundary
+from embodiment.ownership import OwnershipResolver
+from embodiment.ledger import EmbodimentLedger
+from embodiment.thermal_pain import ThermalPainProcessor
 
-from integration.phase1_loop import Phase1Loop
+from integration.embodiment_observer import EmbodimentObserver
+from integration.phase2_loop import Phase2Loop
+
+from identity import IdentityStore, IdentityEngine
 
 
 # ============================================================
-# Streamlit App Setup
+# Streamlit setup
 # ============================================================
 
-st.set_page_config(
-    page_title="A7DO — Frame-Based World",
-    layout="wide",
-)
-
-st.title("A7DO — Frame-Based World (Phase 0 → Phase 1)")
-st.caption("No time • No reward • Frames only • Structural coherence")
+st.set_page_config(page_title="A7DO — Frame-Based Mind", layout="wide")
+st.title("A7DO — Frame-Based Cognitive System")
+st.caption("No time • Frames only • Embodied cognition")
 
 # ============================================================
-# Session State Initialization
+# Session State Init
 # ============================================================
 
-if "world" not in st.session_state:
-    st.session_state.world = make_default_world()
+if "frame_store" not in st.session_state:
+    st.session_state.frame_store = FrameStore()
 
-if "actuators" not in st.session_state:
-    st.session_state.actuators = ActuatorSuite(st.session_state.world)
+if "frames_closed" not in st.session_state:
+    st.session_state.frames_closed = []
 
-if "sensors" not in st.session_state:
-    st.session_state.sensors = SensorSuite(st.session_state.world)
+# ---------------- Embodiment ----------------
 
-if "phase1" not in st.session_state:
-    st.session_state.phase1 = Phase1Loop()
+if "boundaries" not in st.session_state:
+    bm = BoundaryMap()
+    bm.add(Boundary("left", (0, 0), (0, 4)))
+    bm.add(Boundary("right", (4, 0), (4, 4)))
+    bm.add(Boundary("top", (0, 0), (4, 0)))
+    bm.add(Boundary("bottom", (0, 4), (4, 4)))
+    st.session_state.boundaries = bm
 
-if "frames" not in st.session_state:
-    st.session_state.frames: List[List[WorldEvent]] = []
+if "ledger" not in st.session_state:
+    st.session_state.ledger = EmbodimentLedger()
 
-if "last_events" not in st.session_state:
-    st.session_state.last_events: List[WorldEvent] = []
-
-
-# ============================================================
-# Helper: Advance One Frame
-# ============================================================
-
-def run_frame(intent: ActionIntent | None) -> None:
-    """
-    Execute exactly ONE frame:
-    Action → Physics → Sensors → Events
-    """
-    frame_events: List[WorldEvent] = []
-
-    # Apply action if provided
-    if intent is not None:
-        frame_events.extend(
-            st.session_state.actuators.apply(intent)
-        )
-
-    # Always sense after physics
-    frame_events.extend(
-        st.session_state.sensors.sense()
+if "ownership" not in st.session_state:
+    st.session_state.ownership = OwnershipResolver(
+        known_regions={"left", "right", "top", "bottom"}
     )
 
-    # Store
-    st.session_state.last_events = frame_events
-    st.session_state.frames.append(frame_events)
+if "thermal" not in st.session_state:
+    st.session_state.thermal = ThermalPainProcessor()
 
-    # Limit frame history (frames ≠ time)
-    MAX_FRAMES = 6
-    st.session_state.frames = st.session_state.frames[-MAX_FRAMES:]
+if "embodiment_observer" not in st.session_state:
+    st.session_state.embodiment_observer = EmbodimentObserver(
+        boundaries=st.session_state.boundaries,
+        ownership=st.session_state.ownership,
+        ledger=st.session_state.ledger,
+        thermal=st.session_state.thermal,
+    )
 
+# ---------------- Phase Loops ----------------
+
+if "phase2" not in st.session_state:
+    st.session_state.phase2 = Phase2Loop()
+
+# ---------------- Identity ----------------
+
+if "identity_store" not in st.session_state:
+    st.session_state.identity_store = IdentityStore("data/identity/identity.json")
+    st.session_state.identity_engine = IdentityEngine()
+    st.session_state.identity = st.session_state.identity_store.load()
 
 # ============================================================
 # Controls
 # ============================================================
 
-st.subheader("Controls")
+st.subheader("World Interaction (Frame-Based)")
 
-col_move, col_info = st.columns([1, 3])
+col1, col2, col3 = st.columns(3)
 
-with col_move:
-    if st.button("⬆️ Up"):
-        run_frame(ActionIntent(name="move", payload={"dx": 0, "dy": -1}))
-
-    if st.button("⬇️ Down"):
-        run_frame(ActionIntent(name="move", payload={"dx": 0, "dy": 1}))
-
-    if st.button("⬅️ Left"):
-        run_frame(ActionIntent(name="move", payload={"dx": -1, "dy": 0}))
-
-    if st.button("➡️ Right"):
-        run_frame(ActionIntent(name="move", payload={"dx": 1, "dy": 0}))
-
-    if st.button("No Action (Sense Only)"):
-        run_frame(None)
-
-with col_info:
-    st.markdown(
-        """
-        **Frame Doctrine**
-        - Each button press = **one frame**
-        - No clocks, no loops, no background ticking
-        - Learning comes from structure, not reward
-        """
-    )
-
-# ============================================================
-# World Snapshot
-# ============================================================
-
-st.subheader("World Snapshot")
-
-ws = st.session_state.world.snapshot()
-
-col_w1, col_w2 = st.columns(2)
-
-with col_w1:
-    st.json(ws["agent"])
-
-with col_w2:
-    st.json({
-        "walls_count": ws["walls_count"],
-        "event_counter": ws["event_counter"],
-    })
-
-# ============================================================
-# Last Frame Events
-# ============================================================
-
-st.subheader("Last Frame Events")
-
-if st.session_state.last_events:
-    for e in st.session_state.last_events:
-        st.code(
-            f"{e.type.value.upper():>11} | {e.name:<20} | {e.payload}",
-            language="text",
+with col1:
+    if st.button("⬆️ Contact Top"):
+        st.session_state.frame_store.add_fragment(
+            Fragment(
+                source="world",
+                kind="contact",
+                payload={"x": 2, "y": 0},
+            )
         )
-else:
-    st.caption("No frames yet.")
+
+with col2:
+    if st.button("🔥 Thermal Bottom"):
+        st.session_state.frame_store.add_fragment(
+            Fragment(
+                source="world",
+                kind="thermal",
+                payload={"region": "bottom", "delta": 0.7},
+            )
+        )
+
+with col3:
+    if st.button("💥 Force Left"):
+        st.session_state.frame_store.add_fragment(
+            Fragment(
+                source="world",
+                kind="force",
+                payload={"region": "left", "force": 6.0},
+            )
+        )
+
+if st.button("⏹️ Close Frame"):
+    closed = st.session_state.frame_store.close()
+    if closed:
+        st.session_state.frames_closed.append(closed)
+        st.session_state.embodiment_observer.observe_frame(closed)
+
+        # Phase 1 + 2
+        entry, pref, trace = st.session_state.phase2.step(
+            frames=[[f for f in closed.fragments]]
+        )
+
+        # Identity update (ownership consistency placeholder = 0.8)
+        st.session_state.identity = st.session_state.identity_engine.update(
+            st.session_state.identity,
+            coherence=entry.coherence,
+            fragmentation=entry.fragmentation,
+            prediction_error=entry.prediction_error_l1,
+            ownership_consistency=0.8,
+            new_trace=trace,
+        )
+
+        st.session_state.identity_store.save(st.session_state.identity)
 
 # ============================================================
-# Phase 1 Analysis (Prediction → Accounting → Preference)
-# ============================================================
-
-if st.session_state.frames:
-    entry, pref = st.session_state.phase1.step(
-        frames=st.session_state.frames
-    )
-
-    st.subheader("Phase 1 — Structural Signals")
-
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        st.metric("Coherence", f"{entry.coherence:.2f}")
-        st.metric("Fragmentation", f"{entry.fragmentation:.2f}")
-
-    with c2:
-        st.metric("Prediction Error", f"{entry.prediction_error_l1:.2f}")
-        st.metric("Block Rate", f"{entry.outcome_block_rate:.2f}")
-
-    with c3:
-        st.metric("Context Preference", f"{pref.updated:.2f}")
-        st.caption(f"Context: {pref.context_key}")
-        st.caption(f"Δ Preference: {pref.delta:+.3f}")
-
-    if entry.notes:
-        st.caption("Notes: " + ", ".join(entry.notes))
-
-else:
-    st.caption("Phase 1 will activate after the first frame.")
-
-# ============================================================
-# Footer
+# Display
 # ============================================================
 
 st.divider()
-st.caption(
-    "A7DO • Sandy’s Law • Frames ≠ Time • Stability before Intelligence"
-)
+st.subheader("Frames")
+
+for f in st.session_state.frames_closed[-5:]:
+    st.code(
+        f"Frame {f.id} | fragments={len(f.fragments)}",
+        language="text",
+    )
+
+# ---------------- Embodiment ----------------
+
+st.divider()
+st.subheader("Embodiment Ledger")
+
+ledger_snapshot = st.session_state.ledger.snapshot()
+if ledger_snapshot:
+    df = pd.DataFrame.from_dict(
+        {k: vars(v) for k, v in ledger_snapshot.items()},
+        orient="index",
+    )
+    st.dataframe(df)
+else:
+    st.caption("No embodiment data yet.")
+
+# ---------------- Memory ----------------
+
+st.divider()
+st.subheader("Structural Memory")
+
+traces = st.session_state.phase2.memory.traces()
+if traces:
+    for t in traces:
+        st.code(
+            f"{t.signature} | strength={t.strength:.2f} | frames={t.frames_observed}",
+            language="text",
+        )
+else:
+    st.caption("No crystallized memory yet.")
+
+# ---------------- Identity ----------------
+
+st.divider()
+st.subheader("Identity (Continuity)")
+
+st.json(st.session_state.identity.to_dict())
