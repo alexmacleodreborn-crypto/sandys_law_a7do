@@ -71,23 +71,25 @@ ledger = st.session_state.ledger
 
 st.set_page_config(page_title="A7DO Cognitive World", layout="wide")
 st.title("🧠 A7DO Cognitive Dashboard")
-st.caption("Frames drive perception • No global time")
+st.caption("Explicit Frames • Episodic Cognition • No Global Time")
 
 # =====================================================
 # FRAME CONTROLS
 # =====================================================
 
+st.subheader("🎛️ Frame Controls")
+
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    if st.button("▶️ Start Frame"):
+    if st.button("▶️ Start Frame", key="start_frame_btn"):
         try:
             fs.open(Frame(domain="world", label="interaction"))
         except RuntimeError as e:
             st.error(str(e))
 
 with col2:
-    if st.button("⏹️ End Frame"):
+    if st.button("⏹️ End Frame", key="end_frame_btn"):
         frame = fs.close()
         if frame:
             ledger.record(frame)
@@ -104,16 +106,20 @@ st.subheader("🌍 World Interaction")
 c1, c2 = st.columns(2)
 
 with c1:
-    if st.button("⬆️ Contact Top"):
+    if st.button("⬆️ Contact Top", key="contact_top_btn"):
         try:
-            fs.add_fragment(Fragment("world", "contact", {"region": "top"}))
+            fs.add_fragment(
+                Fragment("world", "contact", {"region": "top"})
+            )
         except RuntimeError as e:
             st.error(str(e))
 
 with c2:
-    if st.button("⬇️ Contact Bottom"):
+    if st.button("⬇️ Contact Bottom", key="contact_bottom_btn"):
         try:
-            fs.add_fragment(Fragment("world", "contact", {"region": "bottom"}))
+            fs.add_fragment(
+                Fragment("world", "contact", {"region": "bottom"})
+            )
         except RuntimeError as e:
             st.error(str(e))
 
@@ -130,9 +136,11 @@ if fs.active:
         "label": fs.active.label,
         "fragments": len(fs.active.fragments)
     })
+else:
+    st.caption("No active frame")
 
 # =====================================================
-# GRAPHS SECTION
+# GRAPHS
 # =====================================================
 
 st.divider()
@@ -140,40 +148,33 @@ st.subheader("📊 Cognitive Visualisations")
 
 if ledger.frames:
 
-    # -----------------------------
-    # 1. Fragments per Frame
-    # -----------------------------
     frame_ids = list(range(1, len(ledger.frames) + 1))
     frag_counts = [len(f.fragments) for f in ledger.frames]
 
+    # --- Graph 1: Fragments per Frame ---
     fig1, ax1 = plt.subplots()
     ax1.bar(frame_ids, frag_counts)
     ax1.set_title("Fragments per Frame (Perceptual Density)")
     ax1.set_xlabel("Frame")
-    ax1.set_ylabel("Fragment Count")
+    ax1.set_ylabel("Fragments")
     st.pyplot(fig1)
 
-    # -----------------------------
-    # 2. Contact Region Heatmap
-    # -----------------------------
+    # --- Graph 2: Contact Regions ---
     regions = {"top": 0, "bottom": 0}
-
     for frame in ledger.frames:
         for frag in frame.fragments:
             if frag.action == "contact":
-                region = frag.payload.get("region")
-                if region in regions:
-                    regions[region] += 1
+                r = frag.payload.get("region")
+                if r in regions:
+                    regions[r] += 1
 
     fig2, ax2 = plt.subplots()
     ax2.bar(regions.keys(), regions.values())
     ax2.set_title("World Contact Regions")
-    ax2.set_ylabel("Contact Count")
+    ax2.set_ylabel("Count")
     st.pyplot(fig2)
 
-    # -----------------------------
-    # 3. Cognitive Load (Proto-Z)
-    # -----------------------------
+    # --- Graph 3: Cognitive Load (Proto-Z) ---
     fig3, ax3 = plt.subplots()
     ax3.plot(frame_ids, frag_counts, marker="o")
     ax3.set_title("Cognitive Load Across Frames (Proto-Z)")
@@ -182,7 +183,7 @@ if ledger.frames:
     st.pyplot(fig3)
 
 else:
-    st.caption("No completed frames yet — graphs will appear once frames close.")
+    st.caption("Graphs will appear once at least one frame is completed.")
 
 # =====================================================
 # EPISODIC MEMORY
@@ -196,122 +197,12 @@ for i, frame in enumerate(ledger.frames):
         for frag in frame.fragments:
             st.write(f"- {frag.action} | {frag.payload}")
 
-
-# =====================================================
-# PAGE CONFIG
-# =====================================================
-
-st.set_page_config(
-    page_title="A7DO — Cognitive Frame Dashboard",
-    layout="wide"
-)
-
-st.title("🧠 A7DO Cognitive World")
-st.caption("Explicit Frames • Episodic Cognition • No-Time Processing")
-
-# =====================================================
-# FRAME CONTROLS
-# =====================================================
-
-st.subheader("🎛️ Frame Controls")
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    if st.button("▶️ Start Frame"):
-        try:
-            fs.open(Frame(domain="world", label="dashboard_interaction"))
-        except RuntimeError as e:
-            st.error(str(e))
-
-with col2:
-    if st.button("⏹️ End Frame"):
-        frame = fs.close()
-        if frame:
-            ledger.record(frame)
-
-with col3:
-    if fs.active:
-        st.success("Frame ACTIVE")
-    else:
-        st.warning("No active frame")
-
-# =====================================================
-# WORLD INTERACTIONS
-# =====================================================
-
-st.subheader("🌍 World Interaction")
-
-colA, colB = st.columns(2)
-
-with colA:
-    if st.button("⬆️ Contact Top"):
-        try:
-            fs.add_fragment(
-                Fragment("world", "contact", {"region": "top"})
-            )
-        except RuntimeError as e:
-            st.error(str(e))
-
-with colB:
-    if st.button("⬇️ Contact Bottom"):
-        try:
-            fs.add_fragment(
-                Fragment("world", "contact", {"region": "bottom"})
-            )
-        except RuntimeError as e:
-            st.error(str(e))
-
-# =====================================================
-# FRAME INSPECTOR (LIVE VISUALISATION)
-# =====================================================
-
-st.divider()
-st.subheader("🧠 Frame Inspector")
-
-# --- Active Frame ---
-st.markdown("### 🔴 Active Frame")
-
-if fs.active:
-    st.json({
-        "domain": fs.active.domain,
-        "label": fs.active.label,
-        "fragment_count": len(fs.active.fragments)
-    })
-else:
-    st.caption("No active frame")
-
-# --- Fragment Stream ---
-st.markdown("### 📡 Fragment Stream")
-
-if fs.active and fs.active.fragments:
-    for frag in fs.active.fragments:
-        st.code(f"{frag.domain} :: {frag.action} :: {frag.payload}")
-else:
-    st.caption("No fragments recorded")
-
-# =====================================================
-# EPISODIC MEMORY TIMELINE
-# =====================================================
-
-st.divider()
-st.subheader("🧾 Episodic Memory (Ledger)")
-
-if ledger.frames:
-    for i, frame in enumerate(ledger.frames):
-        with st.expander(f"Frame {i+1} — {frame.domain} / {frame.label}"):
-            for frag in frame.fragments:
-                st.write(f"- {frag.action} | {frag.payload}")
-else:
-    st.caption("No completed frames yet")
-
 # =====================================================
 # FOOTER
 # =====================================================
 
 st.divider()
 st.caption(
-    "A7DO operates on explicit cognitive frames. "
-    "Fragments cannot exist without experience."
+    "A7DO enforces explicit experience frames. "
+    "Fragments cannot exist without perception."
 )
-
