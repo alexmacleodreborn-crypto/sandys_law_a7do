@@ -1,3 +1,3 @@
-from identity.record import IdentityRecord
-from identity.store import IdentityStore
-from identity.engine import IdentityEngine
+from .record import IdentityRecord
+from .store import IdentityStore
+from .engine import IdentityEngine
