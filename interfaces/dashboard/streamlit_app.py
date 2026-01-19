@@ -1,8 +1,7 @@
 import streamlit as st
-import pandas as pd
 import matplotlib.pyplot as plt
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 # =====================================================
 # CORE DATA STRUCTURES
@@ -52,6 +51,48 @@ class Ledger:
     def record(self, frame: Frame):
         self.frames.append(frame)
 
+
+# =====================================================
+# PERSISTENT STATE (THIS IS THE KEY ADDITION)
+# =====================================================
+
+@dataclass
+class PersistentState:
+    expected_fragments: float = 0.0
+    pressure: float = 0.0
+    region_bias: Dict[str, float] = field(
+        default_factory=lambda: {"top": 0.0, "bottom": 0.0}
+    )
+    alpha: float = 0.3  # expectation smoothing
+
+
+    def update_from_frame(self, frame: Frame):
+        n = len(frame.fragments)
+
+        # --- expectation (EMA) ---
+        if self.expected_fragments == 0:
+            self.expected_fragments = n
+        else:
+            self.expected_fragments = (
+                self.alpha * n
+                + (1 - self.alpha) * self.expected_fragments
+            )
+
+        # --- pressure (REAL Z) ---
+        self.pressure = n - self.expected_fragments
+
+        # --- slow region bias ---
+        for frag in frame.fragments:
+            if frag.action == "contact":
+                region = frag.payload.get("region")
+                if region in self.region_bias:
+                    self.region_bias[region] += 0.2
+
+        # decay bias slowly
+        for r in self.region_bias:
+            self.region_bias[r] *= 0.95
+
+
 # =====================================================
 # SESSION STATE
 # =====================================================
@@ -62,8 +103,12 @@ if "frame_store" not in st.session_state:
 if "ledger" not in st.session_state:
     st.session_state.ledger = Ledger()
 
+if "persistent" not in st.session_state:
+    st.session_state.persistent = PersistentState()
+
 fs = st.session_state.frame_store
 ledger = st.session_state.ledger
+ps = st.session_state.persistent
 
 # =====================================================
 # PAGE
@@ -71,7 +116,7 @@ ledger = st.session_state.ledger
 
 st.set_page_config(page_title="A7DO Cognitive World", layout="wide")
 st.title("🧠 A7DO Cognitive Dashboard")
-st.caption("Explicit Frames • Episodic Cognition • No Global Time")
+st.caption("Explicit Frames • Persistent State • No Global Time")
 
 # =====================================================
 # FRAME CONTROLS
@@ -79,22 +124,23 @@ st.caption("Explicit Frames • Episodic Cognition • No Global Time")
 
 st.subheader("🎛️ Frame Controls")
 
-col1, col2, col3 = st.columns(3)
+c1, c2, c3 = st.columns(3)
 
-with col1:
-    if st.button("▶️ Start Frame", key="start_frame_btn"):
+with c1:
+    if st.button("▶️ Start Frame", key="start_frame"):
         try:
             fs.open(Frame(domain="world", label="interaction"))
         except RuntimeError as e:
             st.error(str(e))
 
-with col2:
-    if st.button("⏹️ End Frame", key="end_frame_btn"):
+with c2:
+    if st.button("⏹️ End Frame", key="end_frame"):
         frame = fs.close()
         if frame:
             ledger.record(frame)
+            ps.update_from_frame(frame)
 
-with col3:
+with c3:
     st.write("ACTIVE FRAME:", "✅" if fs.active else "❌")
 
 # =====================================================
@@ -103,28 +149,24 @@ with col3:
 
 st.subheader("🌍 World Interaction")
 
-c1, c2 = st.columns(2)
+w1, w2 = st.columns(2)
 
-with c1:
-    if st.button("⬆️ Contact Top", key="contact_top_btn"):
+with w1:
+    if st.button("⬆️ Contact Top", key="contact_top"):
         try:
-            fs.add_fragment(
-                Fragment("world", "contact", {"region": "top"})
-            )
+            fs.add_fragment(Fragment("world", "contact", {"region": "top"}))
         except RuntimeError as e:
             st.error(str(e))
 
-with c2:
-    if st.button("⬇️ Contact Bottom", key="contact_bottom_btn"):
+with w2:
+    if st.button("⬇️ Contact Bottom", key="contact_bottom"):
         try:
-            fs.add_fragment(
-                Fragment("world", "contact", {"region": "bottom"})
-            )
+            fs.add_fragment(Fragment("world", "contact", {"region": "bottom"}))
         except RuntimeError as e:
             st.error(str(e))
 
 # =====================================================
-# FRAME INSPECTOR
+# ACTIVE FRAME INSPECTOR
 # =====================================================
 
 st.divider()
@@ -132,15 +174,15 @@ st.subheader("🧠 Active Frame Inspector")
 
 if fs.active:
     st.json({
-        "domain": fs.active.domain,
-        "label": fs.active.label,
-        "fragments": len(fs.active.fragments)
+        "fragments": len(fs.active.fragments),
+        "expected": round(ps.expected_fragments, 2),
+        "pressure (Z)": round(ps.pressure, 2)
     })
 else:
     st.caption("No active frame")
 
 # =====================================================
-# GRAPHS
+# COGNITIVE VISUALISATIONS
 # =====================================================
 
 st.divider()
@@ -151,39 +193,22 @@ if ledger.frames:
     frame_ids = list(range(1, len(ledger.frames) + 1))
     frag_counts = [len(f.fragments) for f in ledger.frames]
 
-    # --- Graph 1: Fragments per Frame ---
+    # --- Z (pressure vs expectation) ---
     fig1, ax1 = plt.subplots()
-    ax1.bar(frame_ids, frag_counts)
-    ax1.set_title("Fragments per Frame (Perceptual Density)")
-    ax1.set_xlabel("Frame")
-    ax1.set_ylabel("Fragments")
+    ax1.plot(frame_ids, frag_counts, label="Fragments")
+    ax1.axhline(ps.expected_fragments, linestyle="--", label="Expectation")
+    ax1.set_title("Z = Pressure vs Expectation")
+    ax1.legend()
     st.pyplot(fig1)
 
-    # --- Graph 2: Contact Regions ---
-    regions = {"top": 0, "bottom": 0}
-    for frame in ledger.frames:
-        for frag in frame.fragments:
-            if frag.action == "contact":
-                r = frag.payload.get("region")
-                if r in regions:
-                    regions[r] += 1
-
+    # --- Region Bias ---
     fig2, ax2 = plt.subplots()
-    ax2.bar(regions.keys(), regions.values())
-    ax2.set_title("World Contact Regions")
-    ax2.set_ylabel("Count")
+    ax2.bar(ps.region_bias.keys(), ps.region_bias.values())
+    ax2.set_title("Persistent World Bias")
     st.pyplot(fig2)
 
-    # --- Graph 3: Cognitive Load (Proto-Z) ---
-    fig3, ax3 = plt.subplots()
-    ax3.plot(frame_ids, frag_counts, marker="o")
-    ax3.set_title("Cognitive Load Across Frames (Proto-Z)")
-    ax3.set_xlabel("Frame")
-    ax3.set_ylabel("Load")
-    st.pyplot(fig3)
-
 else:
-    st.caption("Graphs will appear once at least one frame is completed.")
+    st.caption("No completed frames yet")
 
 # =====================================================
 # EPISODIC MEMORY
@@ -203,6 +228,6 @@ for i, frame in enumerate(ledger.frames):
 
 st.divider()
 st.caption(
-    "A7DO enforces explicit experience frames. "
-    "Fragments cannot exist without perception."
+    "Persistent State carries expectation and pressure across frames. "
+    "This restores cognitive coherence without time."
 )
