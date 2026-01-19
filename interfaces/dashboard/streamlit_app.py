@@ -4,32 +4,29 @@ import sys
 from pathlib import Path
 
 # ------------------------------------------------------------
-# Ensure project root is on Python path
+# Ensure the directory containing "sandys_law_a7do/" is on sys.path
+# File is: sandys_law_a7do/interfaces/dashboard/streamlit_app.py
+# parents[0]=dashboard, [1]=interfaces, [2]=sandys_law_a7do, [3]=<parent>
 # ------------------------------------------------------------
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
+ROOT_PARENT = Path(__file__).resolve().parents[3]
+if str(ROOT_PARENT) not in sys.path:
+    sys.path.insert(0, str(ROOT_PARENT))
 
 import streamlit as st
 import pandas as pd
 
-# ============================================================
-# Core imports
-# ============================================================
+from sandys_law_a7do.frames import FrameStore
+from sandys_law_a7do.frames.fragment import Fragment
 
-from frames import FrameStore
-from frames.fragment import Fragment
+from sandys_law_a7do.embodiment.boundaries import BoundaryMap, Boundary
+from sandys_law_a7do.embodiment.ownership import OwnershipResolver
+from sandys_law_a7do.embodiment.ledger import EmbodimentLedger
+from sandys_law_a7do.embodiment.thermal_pain import ThermalPainProcessor
 
-from embodiment.boundaries import BoundaryMap, Boundary
-from embodiment.ownership import OwnershipResolver
-from embodiment.ledger import EmbodimentLedger
-from embodiment.thermal_pain import ThermalPainProcessor
+from sandys_law_a7do.integration.embodiment_observer import EmbodimentObserver
+from sandys_law_a7do.integration.phase2_loop import Phase2Loop
 
-from integration.embodiment_observer import EmbodimentObserver
-from integration.phase2_loop import Phase2Loop
-
-from identity import IdentityStore, IdentityEngine
+from sandys_law_a7do.identity import IdentityStore, IdentityEngine
 
 
 # ============================================================
@@ -64,9 +61,7 @@ if "ledger" not in st.session_state:
     st.session_state.ledger = EmbodimentLedger()
 
 if "ownership" not in st.session_state:
-    st.session_state.ownership = OwnershipResolver(
-        known_regions={"left", "right", "top", "bottom"}
-    )
+    st.session_state.ownership = OwnershipResolver(known_regions={"left", "right", "top", "bottom"})
 
 if "thermal" not in st.session_state:
     st.session_state.thermal = ThermalPainProcessor()
@@ -92,7 +87,7 @@ if "identity_store" not in st.session_state:
     st.session_state.identity = st.session_state.identity_store.load()
 
 # ============================================================
-# Ensure a frame is always active before interaction
+# Ensure an active frame exists
 # ============================================================
 
 if st.session_state.frame_store.active is None:
@@ -109,31 +104,19 @@ col1, col2, col3 = st.columns(3)
 with col1:
     if st.button("⬆️ Contact Top"):
         st.session_state.frame_store.add_fragment(
-            Fragment(
-                source="world",
-                kind="contact",
-                payload={"x": 2, "y": 0},
-            )
+            Fragment(source="world", kind="contact", payload={"x": 2, "y": 0})
         )
 
 with col2:
     if st.button("🔥 Thermal Bottom"):
         st.session_state.frame_store.add_fragment(
-            Fragment(
-                source="world",
-                kind="thermal",
-                payload={"region": "bottom", "delta": 0.7},
-            )
+            Fragment(source="world", kind="thermal", payload={"region": "bottom", "delta": 0.7})
         )
 
 with col3:
     if st.button("💥 Force Left"):
         st.session_state.frame_store.add_fragment(
-            Fragment(
-                source="world",
-                kind="force",
-                payload={"region": "left", "force": 6.0},
-            )
+            Fragment(source="world", kind="force", payload={"region": "left", "force": 6.0})
         )
 
 # ============================================================
@@ -145,23 +128,18 @@ if st.button("⏹️ Close Frame"):
     if closed:
         st.session_state.frames_closed.append(closed)
 
-        # ---- Embodiment observes CLOSED frame only
+        # Embodiment observes CLOSED frame only
         st.session_state.embodiment_observer.observe_frame(closed)
 
-        # ---- Phase 1 + 2 (accounting, prediction, memory)
-        entry, pref, trace = st.session_state.phase2.step(
-            frames=[closed]
-        )
+        # Phase 1+2: expects frames, consumes .fragments internally
+        entry, pref, trace = st.session_state.phase2.step(frames=[closed])
 
-        # ---- Ownership consistency from ledger (grounded)
+        # Ownership consistency grounded in ledger
         ledger_snapshot = st.session_state.ledger.snapshot()
-        total_contacts = sum(v.contacts for v in ledger_snapshot.values())
-        owned_contacts = total_contacts  # all current regions are owned
-        ownership_consistency = (
-            1.0 if total_contacts == 0 else owned_contacts / total_contacts
-        )
+        total_contacts = sum(v.contacts for v in ledger_snapshot.values()) if ledger_snapshot else 0
+        ownership_consistency = 1.0 if total_contacts == 0 else 1.0  # all current regions are owned
 
-        # ---- Identity update
+        # Identity update (continuity)
         st.session_state.identity = st.session_state.identity_engine.update(
             st.session_state.identity,
             coherence=entry.coherence,
@@ -170,10 +148,9 @@ if st.button("⏹️ Close Frame"):
             ownership_consistency=ownership_consistency,
             new_trace=trace,
         )
-
         st.session_state.identity_store.save(st.session_state.identity)
 
-        # ---- Begin a new frame immediately
+        # Begin next frame immediately
         st.session_state.frame_store.begin()
 
 # ============================================================
@@ -184,27 +161,17 @@ st.divider()
 st.subheader("Frames (recent)")
 
 for f in st.session_state.frames_closed[-5:]:
-    st.code(
-        f"Frame {f.id} | fragments={len(f.fragments)}",
-        language="text",
-    )
-
-# ---------------- Embodiment ----------------
+    st.code(f"Frame {f.id} | fragments={len(f.fragments)}", language="text")
 
 st.divider()
 st.subheader("Embodiment Ledger")
 
 ledger_snapshot = st.session_state.ledger.snapshot()
 if ledger_snapshot:
-    df = pd.DataFrame.from_dict(
-        {k: vars(v) for k, v in ledger_snapshot.items()},
-        orient="index",
-    )
+    df = pd.DataFrame.from_dict({k: vars(v) for k, v in ledger_snapshot.items()}, orient="index")
     st.dataframe(df)
 else:
     st.caption("No embodiment data yet.")
-
-# ---------------- Memory ----------------
 
 st.divider()
 st.subheader("Structural Memory")
@@ -212,17 +179,11 @@ st.subheader("Structural Memory")
 traces = st.session_state.phase2.memory.traces()
 if traces:
     for t in traces:
-        st.code(
-            f"{t.signature} | strength={t.strength:.2f} | frames={t.frames_observed}",
-            language="text",
-        )
+        st.code(f"{t.signature} | strength={t.strength:.2f} | frames={t.frames_observed}", language="text")
 else:
     st.caption("No crystallized memory yet.")
-
-# ---------------- Identity ----------------
 
 st.divider()
 st.subheader("Identity (Continuity)")
 
 st.json(st.session_state.identity.to_dict())
-
