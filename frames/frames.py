@@ -4,6 +4,7 @@ from typing import List
 from uuid import uuid4
 
 from frames.fragment import Fragment
+from frame_store import FrameStore
 
 
 @dataclass
