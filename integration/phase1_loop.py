@@ -71,7 +71,7 @@ class Phase1Loop:
         # Flatten recent events for prediction error
         recent_events: List[WorldEvent] = []
         for f in frames:
-            recent_events.extend(f)
+            recent_events.extend(f.fragments)
 
         # ---------------------------
         # Prediction error
