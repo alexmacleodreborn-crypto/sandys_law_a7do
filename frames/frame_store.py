@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from typing import List, Optional
 
 from frames.frame import Frame
@@ -8,8 +9,10 @@ class FrameStore:
     """
     Holds active and completed frames.
 
-    No timing.
-    No ordering assumptions beyond creation.
+    Doctrine:
+    - No time
+    - Frames are explicitly opened and closed
+    - Only one active frame at a time (Phase 0–4)
     """
 
     def __init__(self) -> None:
@@ -17,9 +20,8 @@ class FrameStore:
         self.completed: List[Frame] = []
 
     def begin(self) -> Frame:
-        if self.active is not None:
-            return self.active
-        self.active = Frame()
+        if self.active is None:
+            self.active = Frame()
         return self.active
 
     def add_fragment(self, fragment) -> None:
