@@ -231,7 +231,7 @@ if st.session_state.closed_frames:
         st.code(f"Frame {f.id} | fragments={len(f.fragments)}", language="text")
 else:
     st.caption("No frames closed yet.")
-        st.session_state.frame_store.add_fragment(
+    st.session_state.frame_store.add_fragment(
             Fragment(
                 source="world",
                 kind="contact",
@@ -329,4 +329,5 @@ st.divider()
 st.subheader("Identity (Continuity)")
 
 st.json(st.session_state.identity.to_dict())
+
 
