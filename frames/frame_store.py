@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from frames.frames import Frames
+from frames.frame import Frame
 
 
 class FrameStore:
