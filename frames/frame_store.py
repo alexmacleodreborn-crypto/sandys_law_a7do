@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from frames.frame import Frame
 
-
+@dataclass    
 class FrameStore:
     """
     Holds active and completed frames.
