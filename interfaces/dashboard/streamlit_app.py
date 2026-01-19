@@ -15,7 +15,7 @@ if str(ROOT_PARENT) not in sys.path:
 import streamlit as st
 import pandas as pd
 
-from sandys_law_a7do.frames.frame_store import FrameStore
+from sandys_law_a7do.frames import FrameStore
 from sandys_law_a7do.frames.fragment import Fragment
 
 from sandys_law_a7do.embodiment.boundaries import BoundaryMap, Boundary
@@ -187,4 +187,5 @@ st.divider()
 st.subheader("Identity (Continuity)")
 
 st.json(st.session_state.identity.to_dict())
+
 
