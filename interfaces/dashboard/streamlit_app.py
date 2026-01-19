@@ -3,8 +3,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-# Ensure project root is on PYTHONPATH
-ROOT = Path(__file__).resolve().parents[1]
+# ------------------------------------------------------------
+# Ensure project root is on Python path
+# ------------------------------------------------------------
+ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
