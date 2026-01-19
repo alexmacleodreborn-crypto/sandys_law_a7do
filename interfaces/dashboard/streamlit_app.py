@@ -1,11 +1,11 @@
-# sandys_law_a7do/interfaces/dashboard/streamlit_app.py
-
 import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
 from dataclasses import dataclass, field
 from typing import List, Optional
 
 # =====================================================
-# CORE DATA STRUCTURES (INLINE SAFE)
+# CORE DATA STRUCTURES
 # =====================================================
 
 @dataclass
@@ -52,9 +52,8 @@ class Ledger:
     def record(self, frame: Frame):
         self.frames.append(frame)
 
-
 # =====================================================
-# SESSION STATE INIT
+# SESSION STATE
 # =====================================================
 
 if "frame_store" not in st.session_state:
@@ -63,9 +62,140 @@ if "frame_store" not in st.session_state:
 if "ledger" not in st.session_state:
     st.session_state.ledger = Ledger()
 
-
 fs = st.session_state.frame_store
 ledger = st.session_state.ledger
+
+# =====================================================
+# PAGE
+# =====================================================
+
+st.set_page_config(page_title="A7DO Cognitive World", layout="wide")
+st.title("🧠 A7DO Cognitive Dashboard")
+st.caption("Frames drive perception • No global time")
+
+# =====================================================
+# FRAME CONTROLS
+# =====================================================
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    if st.button("▶️ Start Frame"):
+        try:
+            fs.open(Frame(domain="world", label="interaction"))
+        except RuntimeError as e:
+            st.error(str(e))
+
+with col2:
+    if st.button("⏹️ End Frame"):
+        frame = fs.close()
+        if frame:
+            ledger.record(frame)
+
+with col3:
+    st.write("ACTIVE FRAME:", "✅" if fs.active else "❌")
+
+# =====================================================
+# WORLD INTERACTION
+# =====================================================
+
+st.subheader("🌍 World Interaction")
+
+c1, c2 = st.columns(2)
+
+with c1:
+    if st.button("⬆️ Contact Top"):
+        try:
+            fs.add_fragment(Fragment("world", "contact", {"region": "top"}))
+        except RuntimeError as e:
+            st.error(str(e))
+
+with c2:
+    if st.button("⬇️ Contact Bottom"):
+        try:
+            fs.add_fragment(Fragment("world", "contact", {"region": "bottom"}))
+        except RuntimeError as e:
+            st.error(str(e))
+
+# =====================================================
+# FRAME INSPECTOR
+# =====================================================
+
+st.divider()
+st.subheader("🧠 Active Frame Inspector")
+
+if fs.active:
+    st.json({
+        "domain": fs.active.domain,
+        "label": fs.active.label,
+        "fragments": len(fs.active.fragments)
+    })
+
+# =====================================================
+# GRAPHS SECTION
+# =====================================================
+
+st.divider()
+st.subheader("📊 Cognitive Visualisations")
+
+if ledger.frames:
+
+    # -----------------------------
+    # 1. Fragments per Frame
+    # -----------------------------
+    frame_ids = list(range(1, len(ledger.frames) + 1))
+    frag_counts = [len(f.fragments) for f in ledger.frames]
+
+    fig1, ax1 = plt.subplots()
+    ax1.bar(frame_ids, frag_counts)
+    ax1.set_title("Fragments per Frame (Perceptual Density)")
+    ax1.set_xlabel("Frame")
+    ax1.set_ylabel("Fragment Count")
+    st.pyplot(fig1)
+
+    # -----------------------------
+    # 2. Contact Region Heatmap
+    # -----------------------------
+    regions = {"top": 0, "bottom": 0}
+
+    for frame in ledger.frames:
+        for frag in frame.fragments:
+            if frag.action == "contact":
+                region = frag.payload.get("region")
+                if region in regions:
+                    regions[region] += 1
+
+    fig2, ax2 = plt.subplots()
+    ax2.bar(regions.keys(), regions.values())
+    ax2.set_title("World Contact Regions")
+    ax2.set_ylabel("Contact Count")
+    st.pyplot(fig2)
+
+    # -----------------------------
+    # 3. Cognitive Load (Proto-Z)
+    # -----------------------------
+    fig3, ax3 = plt.subplots()
+    ax3.plot(frame_ids, frag_counts, marker="o")
+    ax3.set_title("Cognitive Load Across Frames (Proto-Z)")
+    ax3.set_xlabel("Frame")
+    ax3.set_ylabel("Load")
+    st.pyplot(fig3)
+
+else:
+    st.caption("No completed frames yet — graphs will appear once frames close.")
+
+# =====================================================
+# EPISODIC MEMORY
+# =====================================================
+
+st.divider()
+st.subheader("🧾 Episodic Memory")
+
+for i, frame in enumerate(ledger.frames):
+    with st.expander(f"Frame {i+1}"):
+        for frag in frame.fragments:
+            st.write(f"- {frag.action} | {frag.payload}")
+
 
 # =====================================================
 # PAGE CONFIG
@@ -184,3 +314,4 @@ st.caption(
     "A7DO operates on explicit cognitive frames. "
     "Fragments cannot exist without experience."
 )
+
