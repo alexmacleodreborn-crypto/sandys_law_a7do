@@ -1,46 +1,22 @@
-from __future__ import annotations
+# sandys_law_a7do/memory/trace.py
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import Any, Dict, List
 
 
 @dataclass
 class MemoryTrace:
-    signature: str
-    strength: float
-    frames_observed: int
-    signatures: List[str] = field(default_factory=list)
+    """
+    Atomic memory unit.
+    Immutable record of an experience.
+    """
+    trace_id: int
+    features: Dict[str, Any]
+    weight: float = 1.0
+    tags: List[str] = field(default_factory=list)
 
-    # --------------------------------------------------------
+    def reinforce(self, amount: float):
+        self.weight += amount
 
-    @classmethod
-    def from_frames(
-        cls,
-        *,
-        frames: List,
-        coherence: float,
-        fragmentation: float,
-    ) -> "MemoryTrace":
-        sigs = []
-        for f in frames:
-            for frag in f.fragments:
-                sigs.append(f"{frag.kind}:{frag.payload.get('region','*')}")
-
-        signature = "|".join(sorted(set(sigs)))
-        strength = max(0.0, coherence - fragmentation)
-
-        return cls(
-            signature=signature,
-            strength=strength,
-            frames_observed=1,
-            signatures=list(set(sigs)),
-        )
-
-    # --------------------------------------------------------
-
-    def merge(self, other: "MemoryTrace") -> None:
-        self.frames_observed += other.frames_observed
-        self.strength = min(
-            1.0,
-            (self.strength + other.strength) / 2.0,
-        )
+    def decay(self, factor: float):
+        self.weight *= factor
