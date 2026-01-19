@@ -18,7 +18,7 @@ import pandas as pd
 # Core imports
 # ============================================================
 
-from frames.framestore import FrameStore
+from frames import FrameStore
 from frames.fragment import Fragment
 
 from embodiment.boundaries import BoundaryMap, Boundary
@@ -225,3 +225,4 @@ st.divider()
 st.subheader("Identity (Continuity)")
 
 st.json(st.session_state.identity.to_dict())
+
