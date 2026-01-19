@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-
 import streamlit as st
 import pandas as pd
 
@@ -37,7 +36,7 @@ st.title("A7DO — Frame-Based Cognitive System")
 st.caption("No time • Frames only • Embodied cognition")
 
 # ============================================================
-# Session State Initialization
+# Session State Init
 # ============================================================
 
 if "frame_store" not in st.session_state:
@@ -55,7 +54,7 @@ if "identity_store" not in st.session_state:
     st.session_state.identity_engine = IdentityEngine()
     st.session_state.identity = st.session_state.identity_store.load()
 
-# ---------- Plot buffer (PERSISTENT) ----------
+# -------- Plot Buffer (persistent) --------
 
 if "plot_buffer" not in st.session_state:
     st.session_state.plot_buffer = {
@@ -66,6 +65,128 @@ if "plot_buffer" not in st.session_state:
         "prediction_error": [],
     }
 
+# ============================================================
+# Controls
+# ============================================================
+
+st.subheader("Frame Interaction")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    if st.button("⬆️ Contact Top", key="contact_top"):
+        st.session_state.frame_store.add_fragment(
+            Fragment("world", "contact", {"region": "top"})
+        )
+
+with col2:
+    if st.button("🔥 Thermal Bottom", key="thermal_bottom"):
+        st.session_state.frame_store.add_fragment(
+            Fragment("world", "thermal", {"region": "bottom", "delta": 0.7})
+        )
+
+with col3:
+    if st.button("💥 Force Left", key="force_left"):
+        st.session_state.frame_store.add_fragment(
+            Fragment("world", "force", {"region": "left", "force": 6.0})
+        )
+
+# ============================================================
+# Close Frame
+# ============================================================
+
+if st.button("⏹️ Close Frame", key="close_frame"):
+    closed = st.session_state.frame_store.close()
+
+    if closed:
+        st.session_state.closed_frames.append(closed)
+
+        # ---- Phase processing ----
+        entry, pref_update, trace = st.session_state.phase2.step([closed])
+
+        # ---- Identity update ----
+        st.session_state.identity = st.session_state.identity_engine.update(
+            st.session_state.identity,
+            coherence=entry.coherence,
+            fragmentation=entry.fragmentation,
+            prediction_error=entry.prediction_error_l1,
+            ownership_consistency=1.0,
+            new_trace=trace,
+        )
+        st.session_state.identity_store.save(st.session_state.identity)
+
+        # ---- Plot buffer ----
+        i = len(st.session_state.plot_buffer["frame_index"])
+        st.session_state.plot_buffer["frame_index"].append(i)
+        st.session_state.plot_buffer["coherence"].append(entry.coherence)
+        st.session_state.plot_buffer["fragmentation"].append(entry.fragmentation)
+        st.session_state.plot_buffer["confidence"].append(
+            st.session_state.identity.confidence
+        )
+        st.session_state.plot_buffer["prediction_error"].append(
+            entry.prediction_error_l1
+        )
+
+        st.session_state.frame_store.begin()
+
+# ============================================================
+# Identity Dynamics Plot
+# ============================================================
+
+st.divider()
+st.subheader("Identity Dynamics (Frame-Based)")
+
+df = pd.DataFrame(st.session_state.plot_buffer)
+
+if not df.empty:
+    st.line_chart(
+        df.set_index("frame_index")[
+            ["coherence", "fragmentation", "confidence", "prediction_error"]
+        ]
+    )
+else:
+    st.caption("No frames processed yet.")
+
+# ============================================================
+# Preference Field
+# ============================================================
+
+st.divider()
+st.subheader("Preference Field (Stage C1)")
+
+prefs = st.session_state.phase2.preference_field.snapshot()
+if prefs:
+    st.dataframe(
+        pd.DataFrame.from_dict(prefs, orient="index", columns=["strength"])
+        .sort_values("strength", ascending=False)
+    )
+else:
+    st.caption("No preferences formed yet.")
+
+# ============================================================
+# Structural Memory
+# ============================================================
+
+st.divider()
+st.subheader("Structural Memory")
+
+traces = st.session_state.phase2.memory.traces()
+if traces:
+    for t in traces:
+        st.code(
+            f"{t.signature} | strength={t.strength:.2f} | frames={t.frames_observed}"
+        )
+else:
+    st.caption("No crystallized memory yet.")
+
+# ============================================================
+# Identity
+# ============================================================
+
+st.divider()
+st.subheader("Identity")
+
+st.json(st.session_state.identity.to_dict())
 # ============================================================
 # Controls — Frame Interaction
 # ============================================================
@@ -205,3 +326,4 @@ st.divider()
 st.subheader("Identity (Continuity + Traits)")
 
 st.json(st.session_state.identity.to_dict())
+
