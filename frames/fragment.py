@@ -1,16 +1,21 @@
 from __future__ import annotations
-from dataclasses import dataclass
+
+from dataclasses import dataclass, field
 from typing import Any, Dict
+from uuid import uuid4
 
 
 @dataclass(frozen=True)
 class Fragment:
     """
-    Smallest unit of information.
+    Atomic unit of information inside a Frame.
 
-    A fragment does NOT imply meaning.
-    It is just a structured change.
+    - No time
+    - No semantics
+    - Just structured occurrence
     """
-    source: str                 # e.g. "world", "sensor", "body"
-    kind: str                   # e.g. "contact", "thermal", "move"
-    payload: Dict[str, Any]     # raw data only
+    id: str = field(default_factory=lambda: uuid4().hex)
+    source: str = "unknown"
+    kind: str = "unknown"
+    payload: Dict[str, Any] = field(default_factory=dict)
+
