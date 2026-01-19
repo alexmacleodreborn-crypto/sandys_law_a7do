@@ -16,7 +16,7 @@ import pandas as pd
 # Core imports
 # ============================================================
 
-from frames import FrameStore
+from frames.frame_store import FrameStore
 from frames.fragment import Fragment
 
 from embodiment.boundaries import BoundaryMap, Boundary
