@@ -1,30 +1,15 @@
-from __future__ import annotations
+# sandys_law_a7do/frames/frame.py
 
 from dataclasses import dataclass, field
 from typing import List
-from uuid import uuid4
-
 from .fragment import Fragment
-
 
 @dataclass
 class Frame:
-    """
-    A bounded information episode.
-
-    This replaces time.
-    """
-    id: str = field(default_factory=lambda: uuid4().hex)
+    domain: str
+    label: str
     fragments: List[Fragment] = field(default_factory=list)
-    closed: bool = False
 
-    def add(self, fragment: Fragment) -> None:
-        if self.closed:
-            raise RuntimeError("Cannot add fragment to a closed frame")
+    def add(self, fragment: Fragment):
         self.fragments.append(fragment)
 
-    def close(self) -> None:
-        self.closed = True
-
-    def is_empty(self) -> bool:
-        return len(self.fragments) == 0
