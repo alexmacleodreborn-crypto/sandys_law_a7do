@@ -1,31 +1,21 @@
 from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import List
+from typing import Any, Dict
 from uuid import uuid4
 
 
-
-@dataclass
-class Frame:
+@dataclass(frozen=True)
+class Fragment:
     """
-    A bounded information episode.
+    Atomic unit of information inside a Frame.
 
-    This replaces time.
+    - No time
+    - No semantics
+    - Just structured occurrence
     """
     id: str = field(default_factory=lambda: uuid4().hex)
-    fragments: List[Fragment] = field(default_factory=list)
-    closed: bool = False
+    source: str = "unknown"
+    kind: str = "unknown"
+    payload: Dict[str, Any] = field(default_factory=dict)
 
-    def add(self, fragment: Fragment) -> None:
-        if self.closed:
-            raise RuntimeError("Cannot add fragment to closed frame")
-        self.fragments.append(fragment)
-
-    def close(self) -> None:
-        """
-        Marks the end of the frame.
-        """
-        self.closed = True
-
-    def is_empty(self) -> bool:
-        return len(self.fragments) == 0
