@@ -7,7 +7,7 @@ from frames.fragment import Fragment
 
 
 @dataclass
-class Frame:
+class Frames:
     """
     A bounded information episode.
 
