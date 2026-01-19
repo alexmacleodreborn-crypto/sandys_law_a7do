@@ -6,7 +6,7 @@ from dataclasses import replace
 from typing import Optional
 from uuid import uuid4
 
-from identity.record import IdentityRecord
+from .record import IdentityRecord
 
 
 class IdentityStore:

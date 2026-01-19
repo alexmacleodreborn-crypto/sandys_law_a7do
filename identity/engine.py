@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import List, Optional
 
-from identity.record import IdentityRecord
+from .record import IdentityRecord
 from memory.crystallizer import MemoryTrace
 
 
