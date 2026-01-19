@@ -1,40 +1,27 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-from typing import Any, Dict, List
+from dataclasses import dataclass, field
+from typing import Dict, Any
+from uuid import uuid4
 
 
 @dataclass(frozen=True)
 class IdentityRecord:
     """
-    Identity = continuity substrate (NOT personality).
-
-    Doctrine:
-    - No time required
-    - Anchored in body ownership + crystallized memory
-    - Contains stable ids + small state variables only
+    Persistent continuity of the agent.
     """
+    identity_id: str = field(default_factory=lambda: uuid4().hex)
+    coherence: float = 0.0
+    fragmentation: float = 1.0
+    confidence: float = 0.0
 
-    identity_id: str
-    genesis_id: str
-    incarnation: int
-    continuity_version: int
-
-    # Structural continuity (bounded)
-    stability_index: float      # [0..1] grows when coherence persists
-    novelty_index: float        # [0..1] rises when prediction error persists
-    embodiment_integrity: float # [0..1] rises when ownership signals are consistent
-
-    # Commitments (non-semantic tags)
-    commitments: List[str]
+    traits: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
-
-    @staticmethod
-    def clamp01(x: float) -> float:
-        if x < 0.0:
-            return 0.0
-        if x > 1.0:
-            return 1.0
-        return float(x)
+        return {
+            "identity_id": self.identity_id,
+            "coherence": self.coherence,
+            "fragmentation": self.fragmentation,
+            "confidence": self.confidence,
+            "traits": dict(self.traits),
+        }
