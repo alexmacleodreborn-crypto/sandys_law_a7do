@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-from world.world_state import WorldEvent, WorldEventType
 
 
 # ============================================================
@@ -126,49 +125,34 @@ class PredictionErrorEngine:
     # Observed vector extraction
     # --------------------------------------------------------
 
-    def _extract_observed_vector(self, events: List[WorldEvent]) -> Dict[str, float]:
-        """
-        Converts recent OUTCOME events into a minimal observed outcome vector.
+    def _extract_observed_vector(self, recent_events):
+    """
+    Convert observed fragments into a numeric vector.
 
-        This is intentionally tiny and non-semantic.
-        Keys are stable primitives:
-          moved_ok: 1 if last outcome was moved else 0
-          blocked_ok: 1 if last outcome was blocked else 0
-          boundary_block: 1 if reason boundary
-          wall_block: 1 if reason wall
-        """
-        moved = 0.0
-        blocked = 0.0
-        boundary = 0.0
-        wall = 0.0
+    Fragments are information units, not world events.
+    """
+    vec = []
 
-        for e in reversed(events):
-            if e.type != WorldEventType.OUTCOME:
-                continue
+    for e in recent_events:
+        # Fragment-based filtering
+        if e.kind not in ("contact", "thermal", "force", "outcome"):
+            continue
 
-            if e.name == "moved":
-                moved = 1.0
-                blocked = 0.0
-                boundary = 0.0
-                wall = 0.0
-                break
+        # Map fragment payload to scalar signal
+        if e.kind == "contact":
+            vec.append(1.0)
 
-            if e.name == "blocked":
-                moved = 0.0
-                blocked = 1.0
-                reason = str(e.payload.get("reason", ""))
-                if reason == "blocked_by_boundary":
-                    boundary = 1.0
-                elif reason == "blocked_by_wall":
-                    wall = 1.0
-                break
+        elif e.kind == "thermal":
+            vec.append(float(e.payload.get("delta", 0.0)))
 
-        return {
-            "moved": moved,
-            "blocked": blocked,
-            "blocked_by_boundary": boundary,
-            "blocked_by_wall": wall,
-        }
+        elif e.kind == "force":
+            vec.append(float(e.payload.get("force", 0.0)))
+
+        elif e.kind == "outcome":
+            vec.append(1.0)
+
+    return vec
+
 
     # --------------------------------------------------------
     # Utils
