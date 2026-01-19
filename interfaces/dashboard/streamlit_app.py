@@ -8,8 +8,6 @@ import pandas as pd
 
 # ============================================================
 # Ensure repo root is on sys.path
-# File path:
-# sandys_law_a7do/interfaces/dashboard/streamlit_app.py
 # ============================================================
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -17,7 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 # ============================================================
-# Core imports (package-safe)
+# Core imports
 # ============================================================
 
 from sandys_law_a7do.frames import FrameStore
@@ -56,6 +54,17 @@ if "identity_store" not in st.session_state:
     st.session_state.identity_store = IdentityStore("data/identity/identity.json")
     st.session_state.identity_engine = IdentityEngine()
     st.session_state.identity = st.session_state.identity_store.load()
+
+# ---------- Plot buffer (PERSISTENT) ----------
+
+if "plot_buffer" not in st.session_state:
+    st.session_state.plot_buffer = {
+        "frame_index": [],
+        "coherence": [],
+        "fragmentation": [],
+        "confidence": [],
+        "prediction_error": [],
+    }
 
 # ============================================================
 # Controls — Frame Interaction
@@ -121,8 +130,39 @@ if st.button("⏹️ Close Frame", key="btn_close_frame"):
         )
         st.session_state.identity_store.save(st.session_state.identity)
 
+        # ---------------- Plot buffer update ----------------
+        i = len(st.session_state.plot_buffer["frame_index"])
+
+        st.session_state.plot_buffer["frame_index"].append(i)
+        st.session_state.plot_buffer["coherence"].append(entry.coherence)
+        st.session_state.plot_buffer["fragmentation"].append(entry.fragmentation)
+        st.session_state.plot_buffer["confidence"].append(
+            st.session_state.identity.confidence
+        )
+        st.session_state.plot_buffer["prediction_error"].append(
+            entry.prediction_error_l1
+        )
+
         # Begin next frame
         st.session_state.frame_store.begin()
+
+# ============================================================
+# Display — Identity Dynamics (Plots)
+# ============================================================
+
+st.divider()
+st.subheader("Identity Dynamics (Frame-Based)")
+
+df_plot = pd.DataFrame(st.session_state.plot_buffer)
+
+if not df_plot.empty:
+    st.line_chart(
+        df_plot.set_index("frame_index")[
+            ["coherence", "fragmentation", "confidence", "prediction_error"]
+        ]
+    )
+else:
+    st.caption("No frames processed yet.")
 
 # ============================================================
 # Display — Closed Frames
@@ -158,10 +198,10 @@ else:
     st.caption("No crystallized memory yet.")
 
 # ============================================================
-# Display — Identity
+# Display — Identity (with Traits)
 # ============================================================
 
 st.divider()
-st.subheader("Identity (Continuity)")
+st.subheader("Identity (Continuity + Traits)")
 
 st.json(st.session_state.identity.to_dict())
