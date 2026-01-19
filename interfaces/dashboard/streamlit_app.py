@@ -53,17 +53,21 @@ class Ledger:
 
 
 # =====================================================
-# PERSISTENT STATE (THIS IS THE KEY ADDITION)
+# PERSISTENT STATE + Σ
 # =====================================================
 
 @dataclass
 class PersistentState:
     expected_fragments: float = 0.0
-    pressure: float = 0.0
+    pressure: float = 0.0      # Z
+    sigma: float = 0.0         # Σ
+    last_pressure: float = 0.0
     region_bias: Dict[str, float] = field(
         default_factory=lambda: {"top": 0.0, "bottom": 0.0}
     )
-    alpha: float = 0.3  # expectation smoothing
+    alpha: float = 0.3         # expectation smoothing
+    sigma_gain: float = 0.5
+    sigma_decay: float = 0.9
 
 
     def update_from_frame(self, frame: Frame):
@@ -78,8 +82,21 @@ class PersistentState:
                 + (1 - self.alpha) * self.expected_fragments
             )
 
-        # --- pressure (REAL Z) ---
+        # --- pressure (Z) ---
+        self.last_pressure = self.pressure
         self.pressure = n - self.expected_fragments
+
+        # --- Σ (entropy release) ---
+        if abs(self.pressure) < abs(self.last_pressure):
+            # surprise reduced → entropy released
+            delta = abs(self.last_pressure) - abs(self.pressure)
+            self.sigma += self.sigma_gain * delta
+
+        # Σ always decays (no free entropy)
+        self.sigma *= self.sigma_decay
+
+        # Σ relaxes pressure
+        self.pressure *= (1 - min(self.sigma, 0.8))
 
         # --- slow region bias ---
         for frag in frame.fragments:
@@ -88,7 +105,6 @@ class PersistentState:
                 if region in self.region_bias:
                     self.region_bias[region] += 0.2
 
-        # decay bias slowly
         for r in self.region_bias:
             self.region_bias[r] *= 0.95
 
@@ -116,7 +132,7 @@ ps = st.session_state.persistent
 
 st.set_page_config(page_title="A7DO Cognitive World", layout="wide")
 st.title("🧠 A7DO Cognitive Dashboard")
-st.caption("Explicit Frames • Persistent State • No Global Time")
+st.caption("Explicit Frames • Persistent State • Z–Σ Dynamics")
 
 # =====================================================
 # FRAME CONTROLS
@@ -176,7 +192,8 @@ if fs.active:
     st.json({
         "fragments": len(fs.active.fragments),
         "expected": round(ps.expected_fragments, 2),
-        "pressure (Z)": round(ps.pressure, 2)
+        "Z (pressure)": round(ps.pressure, 2),
+        "Σ (entropy)": round(ps.sigma, 2)
     })
 else:
     st.caption("No active frame")
@@ -186,26 +203,32 @@ else:
 # =====================================================
 
 st.divider()
-st.subheader("📊 Cognitive Visualisations")
+st.subheader("📊 Z–Σ Dynamics")
 
 if ledger.frames:
 
     frame_ids = list(range(1, len(ledger.frames) + 1))
     frag_counts = [len(f.fragments) for f in ledger.frames]
 
-    # --- Z (pressure vs expectation) ---
+    # --- Z vs expectation ---
     fig1, ax1 = plt.subplots()
     ax1.plot(frame_ids, frag_counts, label="Fragments")
     ax1.axhline(ps.expected_fragments, linestyle="--", label="Expectation")
-    ax1.set_title("Z = Pressure vs Expectation")
+    ax1.set_title("Z: Pressure vs Expectation")
     ax1.legend()
     st.pyplot(fig1)
 
-    # --- Region Bias ---
+    # --- Σ ---
     fig2, ax2 = plt.subplots()
-    ax2.bar(ps.region_bias.keys(), ps.region_bias.values())
-    ax2.set_title("Persistent World Bias")
+    ax2.bar(["Σ"], [ps.sigma])
+    ax2.set_title("Entropy Release (Σ)")
     st.pyplot(fig2)
+
+    # --- Bias ---
+    fig3, ax3 = plt.subplots()
+    ax3.bar(ps.region_bias.keys(), ps.region_bias.values())
+    ax3.set_title("Persistent World Bias")
+    st.pyplot(fig3)
 
 else:
     st.caption("No completed frames yet")
@@ -228,6 +251,6 @@ for i, frame in enumerate(ledger.frames):
 
 st.divider()
 st.caption(
-    "Persistent State carries expectation and pressure across frames. "
-    "This restores cognitive coherence without time."
+    "Σ allows pressure to relax when surprise reduces. "
+    "Z–Σ dynamics restore coherence without time."
 )
