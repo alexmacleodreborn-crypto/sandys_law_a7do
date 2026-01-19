@@ -1,329 +1,186 @@
-from __future__ import annotations
+# sandys_law_a7do/interfaces/dashboard/streamlit_app.py
 
-import sys
-from pathlib import Path
 import streamlit as st
-import pandas as pd
+from dataclasses import dataclass, field
+from typing import List, Optional
 
-# ============================================================
-# Ensure repo root is on sys.path
-# ============================================================
+# =====================================================
+# CORE DATA STRUCTURES (INLINE SAFE)
+# =====================================================
 
-ROOT = Path(__file__).resolve().parents[3]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+@dataclass
+class Fragment:
+    domain: str
+    action: str
+    payload: dict
 
-# ============================================================
-# Core imports
-# ============================================================
 
-from sandys_law_a7do.frames import FrameStore
-from sandys_law_a7do.frames.fragment import Fragment
+@dataclass
+class Frame:
+    domain: str
+    label: str
+    fragments: List[Fragment] = field(default_factory=list)
 
-from sandys_law_a7do.integration.phase2_loop import Phase2Loop
-from sandys_law_a7do.identity import IdentityStore, IdentityEngine
+    def add(self, fragment: Fragment):
+        self.fragments.append(fragment)
 
-# ============================================================
-# Streamlit setup
-# ============================================================
 
-st.set_page_config(
-    page_title="A7DO — Frame-Based Mind",
-    layout="wide",
-)
+class FrameStore:
+    def __init__(self):
+        self.active: Optional[Frame] = None
 
-st.title("A7DO — Frame-Based Cognitive System")
-st.caption("No time • Frames only • Embodied cognition")
+    def open(self, frame: Frame):
+        if self.active:
+            raise RuntimeError("Frame already active")
+        self.active = frame
 
-# ============================================================
-# Session State Init
-# ============================================================
+    def add_fragment(self, fragment: Fragment):
+        if not self.active:
+            raise RuntimeError("No active frame")
+        self.active.add(fragment)
+
+    def close(self) -> Optional[Frame]:
+        frame = self.active
+        self.active = None
+        return frame
+
+
+class Ledger:
+    def __init__(self):
+        self.frames: List[Frame] = []
+
+    def record(self, frame: Frame):
+        self.frames.append(frame)
+
+
+# =====================================================
+# SESSION STATE INIT
+# =====================================================
 
 if "frame_store" not in st.session_state:
     st.session_state.frame_store = FrameStore()
-    st.session_state.frame_store.begin()
 
-if "closed_frames" not in st.session_state:
-    st.session_state.closed_frames = []
+if "ledger" not in st.session_state:
+    st.session_state.ledger = Ledger()
 
-if "phase2" not in st.session_state:
-    st.session_state.phase2 = Phase2Loop()
 
-if "identity_store" not in st.session_state:
-    st.session_state.identity_store = IdentityStore("data/identity/identity.json")
-    st.session_state.identity_engine = IdentityEngine()
-    st.session_state.identity = st.session_state.identity_store.load()
+fs = st.session_state.frame_store
+ledger = st.session_state.ledger
 
-# -------- Plot Buffer (persistent) --------
+# =====================================================
+# PAGE CONFIG
+# =====================================================
 
-if "plot_buffer" not in st.session_state:
-    st.session_state.plot_buffer = {
-        "frame_index": [],
-        "coherence": [],
-        "fragmentation": [],
-        "confidence": [],
-        "prediction_error": [],
-    }
+st.set_page_config(
+    page_title="A7DO — Cognitive Frame Dashboard",
+    layout="wide"
+)
 
-# ============================================================
-# Controls
-# ============================================================
+st.title("🧠 A7DO Cognitive World")
+st.caption("Explicit Frames • Episodic Cognition • No-Time Processing")
 
-st.subheader("Frame Interaction")
+# =====================================================
+# FRAME CONTROLS
+# =====================================================
+
+st.subheader("🎛️ Frame Controls")
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    if st.button("⬆️ Contact Top", key="contact_top"):
-        st.session_state.frame_store.add_fragment(
-            Fragment("world", "contact", {"region": "top"})
-        )
+    if st.button("▶️ Start Frame"):
+        try:
+            fs.open(Frame(domain="world", label="dashboard_interaction"))
+        except RuntimeError as e:
+            st.error(str(e))
 
 with col2:
-    if st.button("🔥 Thermal Bottom", key="thermal_bottom"):
-        st.session_state.frame_store.add_fragment(
-            Fragment("world", "thermal", {"region": "bottom", "delta": 0.7})
-        )
+    if st.button("⏹️ End Frame"):
+        frame = fs.close()
+        if frame:
+            ledger.record(frame)
 
 with col3:
-    if st.button("💥 Force Left", key="force_left"):
-        st.session_state.frame_store.add_fragment(
-            Fragment("world", "force", {"region": "left", "force": 6.0})
-        )
+    if fs.active:
+        st.success("Frame ACTIVE")
+    else:
+        st.warning("No active frame")
 
-# ============================================================
-# Close Frame
-# ============================================================
+# =====================================================
+# WORLD INTERACTIONS
+# =====================================================
 
-if st.button("⏹️ Close Frame", key="close_frame"):
-    closed = st.session_state.frame_store.close()
+st.subheader("🌍 World Interaction")
 
-    if closed:
-        st.session_state.closed_frames.append(closed)
+colA, colB = st.columns(2)
 
-        # ---- Phase processing ----
-        entry, pref_update, trace = st.session_state.phase2.step([closed])
-
-        # ---- Identity update ----
-        st.session_state.identity = st.session_state.identity_engine.update(
-            st.session_state.identity,
-            coherence=entry.coherence,
-            fragmentation=entry.fragmentation,
-            prediction_error=entry.prediction_error_l1,
-            ownership_consistency=1.0,
-            new_trace=trace,
-        )
-        st.session_state.identity_store.save(st.session_state.identity)
-
-        # ---- Plot buffer ----
-        i = len(st.session_state.plot_buffer["frame_index"])
-        st.session_state.plot_buffer["frame_index"].append(i)
-        st.session_state.plot_buffer["coherence"].append(entry.coherence)
-        st.session_state.plot_buffer["fragmentation"].append(entry.fragmentation)
-        st.session_state.plot_buffer["confidence"].append(
-            st.session_state.identity.confidence
-        )
-        st.session_state.plot_buffer["prediction_error"].append(
-            entry.prediction_error_l1
-        )
-
-        st.session_state.frame_store.begin()
-
-# ============================================================
-# Identity Dynamics Plot
-# ============================================================
-
-st.divider()
-st.subheader("Identity Dynamics (Frame-Based)")
-
-df = pd.DataFrame(st.session_state.plot_buffer)
-
-if not df.empty:
-    st.line_chart(
-        df.set_index("frame_index")[
-            ["coherence", "fragmentation", "confidence", "prediction_error"]
-        ]
-    )
-else:
-    st.caption("No frames processed yet.")
-
-# ============================================================
-# Preference Field
-# ============================================================
-
-st.divider()
-st.subheader("Preference Field (Stage C1)")
-
-prefs = st.session_state.phase2.preference_field.snapshot()
-if prefs:
-    st.dataframe(
-        pd.DataFrame.from_dict(prefs, orient="index", columns=["strength"])
-        .sort_values("strength", ascending=False)
-    )
-else:
-    st.caption("No preferences formed yet.")
-
-# ============================================================
-# Structural Memory
-# ============================================================
-
-st.divider()
-st.subheader("Structural Memory")
-
-traces = st.session_state.phase2.memory.traces()
-if traces:
-    for t in traces:
-        st.code(
-            f"{t.signature} | strength={t.strength:.2f} | frames={t.frames_observed}"
-        )
-else:
-    st.caption("No crystallized memory yet.")
-
-# ============================================================
-# Identity
-# ============================================================
-
-st.divider()
-st.subheader("Identity")
-
-st.json(st.session_state.identity.to_dict())
-# ============================================================
-# Controls — Frame Interaction
-# ============================================================
-
-st.subheader("Frame Interaction")
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    if st.button("⬆️ Contact Top", key="btn_contact_top"):
-        st.session_state.frame_store.add_fragment(
-            Fragment(
-                source="world",
-                kind="contact",
-                payload={"region": "top"},
+with colA:
+    if st.button("⬆️ Contact Top"):
+        try:
+            fs.add_fragment(
+                Fragment("world", "contact", {"region": "top"})
             )
-        )
+        except RuntimeError as e:
+            st.error(str(e))
 
-with col2:
-    if st.button("🔥 Thermal Bottom", key="btn_thermal_bottom"):
-        st.session_state.frame_store.add_fragment(
-            Fragment(
-                source="world",
-                kind="thermal",
-                payload={"region": "bottom", "delta": 0.7},
+with colB:
+    if st.button("⬇️ Contact Bottom"):
+        try:
+            fs.add_fragment(
+                Fragment("world", "contact", {"region": "bottom"})
             )
-        )
+        except RuntimeError as e:
+            st.error(str(e))
 
-with col3:
-    if st.button("💥 Force Left", key="btn_force_left"):
-        st.session_state.frame_store.add_fragment(
-            Fragment(
-                source="world",
-                kind="force",
-                payload={"region": "left", "force": 6.0},
-            )
-        )
-
-# ============================================================
-# Close Frame
-# ============================================================
-
-if st.button("⏹️ Close Frame", key="btn_close_frame"):
-    closed = st.session_state.frame_store.close()
-
-    if closed:
-        st.session_state.closed_frames.append(closed)
-
-        # ---------------- Phase processing ----------------
-        entry, pref, trace = st.session_state.phase2.step(
-            frames=[closed]
-        )
-
-        # ---------------- Identity update ----------------
-        st.session_state.identity = st.session_state.identity_engine.update(
-            st.session_state.identity,
-            coherence=entry.coherence,
-            fragmentation=entry.fragmentation,
-            prediction_error=entry.prediction_error_l1,
-            ownership_consistency=1.0,
-            new_trace=trace,
-        )
-        st.session_state.identity_store.save(st.session_state.identity)
-
-        # ---------------- Plot buffer update ----------------
-        i = len(st.session_state.plot_buffer["frame_index"])
-
-        st.session_state.plot_buffer["frame_index"].append(i)
-        st.session_state.plot_buffer["coherence"].append(entry.coherence)
-        st.session_state.plot_buffer["fragmentation"].append(entry.fragmentation)
-        st.session_state.plot_buffer["confidence"].append(
-            st.session_state.identity.confidence
-        )
-        st.session_state.plot_buffer["prediction_error"].append(
-            entry.prediction_error_l1
-        )
-
-        # Begin next frame
-        st.session_state.frame_store.begin()
-
-# ============================================================
-# Display — Identity Dynamics (Plots)
-# ============================================================
+# =====================================================
+# FRAME INSPECTOR (LIVE VISUALISATION)
+# =====================================================
 
 st.divider()
-st.subheader("Identity Dynamics (Frame-Based)")
+st.subheader("🧠 Frame Inspector")
 
-df_plot = pd.DataFrame(st.session_state.plot_buffer)
+# --- Active Frame ---
+st.markdown("### 🔴 Active Frame")
 
-if not df_plot.empty:
-    st.line_chart(
-        df_plot.set_index("frame_index")[
-            ["coherence", "fragmentation", "confidence", "prediction_error"]
-        ]
-    )
+if fs.active:
+    st.json({
+        "domain": fs.active.domain,
+        "label": fs.active.label,
+        "fragment_count": len(fs.active.fragments)
+    })
 else:
-    st.caption("No frames processed yet.")
+    st.caption("No active frame")
 
-# ============================================================
-# Display — Closed Frames
-# ============================================================
+# --- Fragment Stream ---
+st.markdown("### 📡 Fragment Stream")
 
-st.divider()
-st.subheader("Closed Frames")
-
-if st.session_state.closed_frames:
-    for f in st.session_state.closed_frames[-5:]:
-        st.code(
-            f"Frame {f.id} | fragments={len(f.fragments)}",
-            language="text",
-        )
+if fs.active and fs.active.fragments:
+    for frag in fs.active.fragments:
+        st.code(f"{frag.domain} :: {frag.action} :: {frag.payload}")
 else:
-    st.caption("No frames closed yet.")
+    st.caption("No fragments recorded")
 
-# ============================================================
-# Display — Structural Memory
-# ============================================================
+# =====================================================
+# EPISODIC MEMORY TIMELINE
+# =====================================================
 
 st.divider()
-st.subheader("Structural Memory")
+st.subheader("🧾 Episodic Memory (Ledger)")
 
-traces = st.session_state.phase2.memory.traces()
-if traces:
-    for t in traces:
-        st.code(
-            f"{t.signature} | strength={t.strength:.2f} | frames={t.frames_observed}",
-            language="text",
-        )
+if ledger.frames:
+    for i, frame in enumerate(ledger.frames):
+        with st.expander(f"Frame {i+1} — {frame.domain} / {frame.label}"):
+            for frag in frame.fragments:
+                st.write(f"- {frag.action} | {frag.payload}")
 else:
-    st.caption("No crystallized memory yet.")
+    st.caption("No completed frames yet")
 
-# ============================================================
-# Display — Identity (with Traits)
-# ============================================================
+# =====================================================
+# FOOTER
+# =====================================================
 
 st.divider()
-st.subheader("Identity (Continuity + Traits)")
-
-st.json(st.session_state.identity.to_dict())
-
+st.caption(
+    "A7DO operates on explicit cognitive frames. "
+    "Fragments cannot exist without experience."
+)
