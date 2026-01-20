@@ -258,6 +258,19 @@ scale without alignment collapse
 This is not an assistant.
 It is a new class of intelligence.
 
+## Version Freeze
+
+**A7DO v1.0 — Structural Regulation Core**
+
+This version demonstrates:
+- Structural dynamics via frames and fragments
+- Metric-based regulation (Z, Coherence, Stability)
+- Explicit, visual decision thresholds
+- Regime separation under identical laws
+
+v1.0 is frozen as a reference baseline.
+All future work extends this core without modifying it.
+
 License
 
 Apache License 2.0
