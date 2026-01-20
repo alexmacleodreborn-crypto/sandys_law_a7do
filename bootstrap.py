@@ -2,7 +2,8 @@
 """
 Bootstrap — v1.1
 Structural Regulation Core (v1.0) + Gated Memory (v1.1)
-Authoritative, API-correct version
+
+This version fixes metric key alignment with mind/coherence.py
 """
 
 # =====================================================
@@ -17,13 +18,13 @@ from .mind.coherence import compute_coherence
 from .mind.regulation import regulate
 
 # =====================================================
-# MEMORY (v1.1 — REAL API)
+# MEMORY (v1.1 — real API)
 # =====================================================
 
 from .memory.trace import MemoryTrace
 from .memory.structural_memory import StructuralMemory
 from .memory.crystallizer import crystallize
-from .memory.decay import decay_weight   # ✅ correct name
+from .memory.decay import decay_weight
 
 
 # =====================================================
@@ -74,17 +75,32 @@ def system_snapshot(state: dict) -> dict:
         fragment_count = 0
         unique_actions = 0
 
-    metrics = compute_coherence(
+    # --------------------------------------------------
+    # Canonical metrics from mind/coherence (lowercase)
+    # --------------------------------------------------
+    raw_metrics = compute_coherence(
         fragment_count=fragment_count,
         unique_actions=unique_actions,
         blocked_events=0,
     )
 
+    # --------------------------------------------------
+    # Regulation uses canonical lowercase keys
+    # --------------------------------------------------
     regulation = regulate(
-        coherence=metrics["Coherence"],
-        fragmentation=metrics["Z"],
+        coherence=raw_metrics["coherence"],
+        fragmentation=raw_metrics["z"],
         block_rate=0.0,
     )
+
+    # --------------------------------------------------
+    # Normalised metrics for UI / downstream
+    # --------------------------------------------------
+    metrics = {
+        "Z": raw_metrics["z"],
+        "Coherence": raw_metrics["coherence"],
+        "Stability": raw_metrics["stability"],
+    }
 
     return {
         "ticks": state["ticks"],
@@ -158,4 +174,4 @@ def tick_system(state: dict):
             crystallize(state["memory"])
     else:
         state["stable_ticks"] = 0
-        decay_weight(state["memory"])   # ✅ correct decay call
+        decay_weight(state["memory"])
