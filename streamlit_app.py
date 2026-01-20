@@ -1,14 +1,18 @@
 # streamlit_app.py
 """
-A7DO + Sandy's Law
-Streamlit Interface with Experiment Mode
+A7DO + Sandy’s Law
+Streamlit Interface — Experiment Mode with Metric Plots
 """
 
 import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
 
 
 def run():
-    # Lazy imports
+    # --------------------------------------------------
+    # Lazy imports (Streamlit-safe)
+    # --------------------------------------------------
     from bootstrap import (
         build_system,
         inject_demo_frame,
@@ -24,7 +28,9 @@ def run():
         overload_pattern,
     )
 
-    # Persist system
+    # --------------------------------------------------
+    # Persist system across reruns
+    # --------------------------------------------------
     if "system_bundle" not in st.session_state:
         system, snapshot, state = build_system()
         st.session_state.system_bundle = {
@@ -37,11 +43,36 @@ def run():
     snapshot = bundle["snapshot"]
     state = bundle["state"]
 
-    st.set_page_config(page_title="A7DO Experiment Mode", layout="wide")
+    # --------------------------------------------------
+    # Page setup
+    # --------------------------------------------------
+    st.set_page_config(page_title="A7DO — Sandy’s Law Experiments", layout="wide")
     st.title("A7DO — Sandy’s Law Experiment Mode")
 
     # --------------------------------------------------
-    # SIDEBAR: EXPERIMENTS
+    # Sidebar: manual controls
+    # --------------------------------------------------
+    st.sidebar.header("Manual Frame Controls")
+
+    if st.sidebar.button("▶ Open Demo Frame"):
+        inject_demo_frame(state)
+
+    if st.sidebar.button("➕ Add Demo Fragment"):
+        try:
+            add_fragment(state)
+        except RuntimeError as e:
+            st.sidebar.warning(str(e))
+
+    if st.sidebar.button("⏹ Close Frame"):
+        close_frame(state)
+
+    st.sidebar.divider()
+
+    if st.sidebar.button("⏱ Tick"):
+        tick_system(state)
+
+    # --------------------------------------------------
+    # Sidebar: experiments
     # --------------------------------------------------
     st.sidebar.header("Experiments")
 
@@ -79,29 +110,52 @@ def run():
         )
 
     # --------------------------------------------------
-    # DISPLAY
+    # Snapshot overview
     # --------------------------------------------------
     data = snapshot()
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("Current Metrics")
-        for k, v in data["metrics"].items():
-            st.progress(min(1.0, float(v)))
-            st.caption(f"{k}: {float(v):.3f}")
+        st.subheader("System State")
+        st.json(
+            {
+                "roles": data["roles"],
+                "ticks": data["ticks"],
+                "active_frame": (
+                    {
+                        "domain": data["active_frame"].domain,
+                        "label": data["active_frame"].label,
+                        "fragments": len(data["active_frame"].fragments),
+                    }
+                    if data["active_frame"]
+                    else None
+                ),
+            }
+        )
 
     with col2:
         st.subheader("Regulation")
         st.json(data["regulation"])
 
     # --------------------------------------------------
-    # EXPERIMENT RESULTS
+    # Current metrics
+    # --------------------------------------------------
+    st.subheader("Current Metrics")
+    for k, v in data["metrics"].items():
+        st.progress(min(1.0, float(v)))
+        st.caption(f"{k}: {float(v):.3f}")
+
+    # --------------------------------------------------
+    # Experiment results + plots
     # --------------------------------------------------
     exp = bundle.get("experiment")
     if exp:
         st.subheader(f"Experiment Result: {exp['name']}")
 
+        # -----------------------------
+        # Final state
+        # -----------------------------
         st.write("Final State")
         st.json(
             {
@@ -110,14 +164,46 @@ def run():
             }
         )
 
-        st.write("Timeline")
+        # -----------------------------
+        # Build dataframe from history
+        # -----------------------------
+        rows = []
         for step in exp["history"]:
-            st.write(
-                f"Tick {step['ticks']} → "
-                f"Z={step['metrics']['Z']:.2f}, "
-                f"Coherence={step['metrics']['Coherence']:.2f}, "
-                f"Decision={step['regulation']}"
+            rows.append(
+                {
+                    "Tick": step["ticks"],
+                    "Z": step["metrics"]["Z"],
+                    "Coherence": step["metrics"]["Coherence"],
+                    "Stability": step["metrics"]["Stability"],
+                    "Regulation": step["regulation"],
+                }
             )
+
+        df = pd.DataFrame(rows)
+
+        # -----------------------------
+        # Metric evolution plot
+        # -----------------------------
+        st.subheader("Metric Evolution")
+
+        fig, ax = plt.subplots()
+        ax.plot(df["Tick"], df["Z"], label="Z (Fragmentation)")
+        ax.plot(df["Tick"], df["Coherence"], label="Coherence")
+        ax.plot(df["Tick"], df["Stability"], label="Stability")
+
+        ax.set_xlabel("Tick")
+        ax.set_ylabel("Metric Value")
+        ax.set_ylim(0.0, 1.05)
+        ax.legend()
+        ax.grid(True)
+
+        st.pyplot(fig)
+
+        # -----------------------------
+        # Regulation timeline
+        # -----------------------------
+        st.subheader("Regulation Timeline")
+        st.table(df[["Tick", "Regulation"]])
 
 
 if __name__ == "__main__":
