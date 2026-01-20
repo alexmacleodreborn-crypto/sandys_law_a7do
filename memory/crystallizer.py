@@ -1,23 +1,19 @@
 # sandys_law_a7do/memory/crystallizer.py
+"""
+Crystallizer — v1.1
 
-from typing import List, Dict
-from .trace import MemoryTrace
+Promotes buffered MemoryTrace objects into long-term StructuralMemory.
+
+NOTE:
+Clustering is intentionally NOT performed in v1.1.
+This keeps memory semantics clean and avoids premature abstraction.
+"""
+
+from .structural_memory import StructuralMemory
 
 
-def crystallize(cluster: List[MemoryTrace]) -> Dict:
+def crystallize(memory: StructuralMemory) -> None:
     """
-    Converts a cluster into a structural memory pattern.
+    Promote buffered traces into crystallised memory.
     """
-    if not cluster:
-        return {}
-
-    pattern = {}
-    for trace in cluster:
-        for k, v in trace.features.items():
-            pattern.setdefault(k, set()).add(v)
-
-    return {
-        "pattern": {k: list(v) for k, v in pattern.items()},
-        "strength": sum(t.weight for t in cluster),
-        "size": len(cluster)
-    }
+    memory.crystallize()
