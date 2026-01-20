@@ -1,8 +1,6 @@
 # interfaces/dashboard/streamlit_app.py
 
 import streamlit as st
-from frames.frame import Frame
-from frames.fragment import Fragment
 
 
 def main(system_snapshot_provider):
@@ -12,30 +10,38 @@ def main(system_snapshot_provider):
     # -----------------------------------------
     # SESSION STATE (UI ONLY)
     # -----------------------------------------
-    if "frames" not in st.session_state:
-        st.session_state.frames = []
+    if "demo_frames" not in st.session_state:
+        st.session_state.demo_frames = []
 
     # -----------------------------------------
     # CONTROL PANEL
     # -----------------------------------------
     st.sidebar.header("Controls")
 
-    if st.sidebar.button("➕ Create Frame"):
-        st.session_state.frames.append(Frame())
+    if st.sidebar.button("➕ Create Demo Frame"):
+        st.session_state.demo_frames.append(
+            {
+                "fragments": [],
+                "metadata": {},
+            }
+        )
 
-    if st.sidebar.button("➕ Add Fragment"):
-        if st.session_state.frames:
-            frag = Fragment(kind="demo", payload={"source": "ui"})
-            st.session_state.frames[-1].add(frag)
+    if st.sidebar.button("➕ Add Demo Fragment"):
+        if st.session_state.demo_frames:
+            st.session_state.demo_frames[-1]["fragments"].append(
+                {"kind": "demo", "payload": {"source": "ui"}}
+            )
 
     # -----------------------------------------
-    # SNAPSHOT (override frames safely)
+    # SNAPSHOT
     # -----------------------------------------
     snapshot = system_snapshot_provider()
-    snapshot["frames"] = st.session_state.frames
+
+    # Inject demo frames safely (no core mutation)
+    snapshot["frames"] = st.session_state.demo_frames
 
     # -----------------------------------------
-    # OVERVIEW
+    # SYSTEM OVERVIEW
     # -----------------------------------------
     st.subheader("System Overview")
     st.json(
@@ -52,7 +58,7 @@ def main(system_snapshot_provider):
         st.subheader("Metrics")
         for k, v in snapshot["metrics"].items():
             st.progress(min(1.0, float(v)))
-            st.caption(f"{k}: {v:.2f}")
+            st.caption(f"{k}: {float(v):.2f}")
 
     # -----------------------------------------
     # FRAME INSPECTOR
@@ -65,5 +71,5 @@ def main(system_snapshot_provider):
     else:
         for i, frame in enumerate(frames):
             with st.expander(f"Frame {i}"):
-                st.write("Fragments:", len(frame.fragments))
-                st.json(frame.metadata)
+                st.write("Fragments:", len(frame.get("fragments", [])))
+                st.json(frame.get("metadata", {}))
