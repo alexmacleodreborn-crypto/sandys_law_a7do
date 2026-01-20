@@ -1,23 +1,21 @@
-from __future__ import annotations
-from dataclasses import dataclass
+# sandys_law_a7do/embodiment/ownership.py
+
+from dataclasses import dataclass, field
+from typing import Set
 
 
-@dataclass(frozen=True)
-class OwnershipEvent:
-    region: str
-    owned: bool
-
-
-class OwnershipResolver:
+@dataclass
+class OwnershipMap:
     """
-    Resolves whether a sensation belongs to this body.
+    Tracks which entities are considered part of self.
     """
+    owned_entities: Set[str] = field(default_factory=set)
 
-    def __init__(self, known_regions: set[str]) -> None:
-        self.known_regions = known_regions
+    def claim(self, entity_id: str) -> None:
+        self.owned_entities.add(entity_id)
 
-    def resolve(self, region: str) -> OwnershipEvent:
-        return OwnershipEvent(
-            region=region,
-            owned=region in self.known_regions
-        )
+    def release(self, entity_id: str) -> None:
+        self.owned_entities.discard(entity_id)
+
+    def is_owned(self, entity_id: str) -> bool:
+        return entity_id in self.owned_entities
