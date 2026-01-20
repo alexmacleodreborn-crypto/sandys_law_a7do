@@ -1,7 +1,7 @@
 # bootstrap.py
 """
 A7DO + Sandy's Law
-System Bootstrap (authoritative)
+System Bootstrap (FINAL, NORMALIZED)
 """
 
 from roles.system_manager import SystemManager
@@ -24,6 +24,10 @@ from mind.regulation import regulate
 from accounting.metrics import metric_bundle
 
 
+# =========================================================
+# SYSTEM CONSTRUCTION
+# =========================================================
+
 def build_system():
     frames_store = FrameStore()
     memory = StructuralMemory()
@@ -37,24 +41,45 @@ def build_system():
     sled = SLEDInterface()
     system.register(sled)
 
+    # -----------------------------------------------------
+    # FRAME NORMALIZER (THE KEY FIX)
+    # -----------------------------------------------------
+    def _get_active_frames():
+        """
+        Always return a LIST of frames.
+        Never None. Never non-iterable.
+        """
+        candidates = [
+            getattr(frames_store, "frames", None),
+            getattr(frames_store, "_frames", None),
+            getattr(frames_store, "store", None),
+            getattr(frames_store, "active", None),
+        ]
+
+        for c in candidates:
+            if isinstance(c, list):
+                return c
+
+        # Try callable accessor
+        for name in ("all", "get_all", "list"):
+            fn = getattr(frames_store, name, None)
+            if callable(fn):
+                try:
+                    result = fn()
+                    if isinstance(result, list):
+                        return result
+                except Exception:
+                    pass
+
+        return []  # FINAL GUARANTEE
+
+    # -----------------------------------------------------
+    # SNAPSHOT
+    # -----------------------------------------------------
     def snapshot():
         nonlocal ticks
 
-        # -------------------------------------------------
-        # SAFE FRAME ACCESS (FIX)
-        # -------------------------------------------------
-        if hasattr(frames_store, "frames"):
-            active_frames = frames_store.frames
-        elif hasattr(frames_store, "_frames"):
-            active_frames = frames_store._frames
-        elif hasattr(frames_store, "store"):
-            active_frames = frames_store.store
-        elif hasattr(frames_store, "active"):
-            active_frames = frames_store.active
-        elif hasattr(frames_store, "all"):
-            active_frames = frames_store.all()
-        else:
-            active_frames = []
+        active_frames = _get_active_frames()
 
         # --- Perception ---
         fragments = []
@@ -123,16 +148,15 @@ def build_system():
 
 def inject_demo_frame(state):
     frames_store = state["frames_store"]
+
     frame = Frame()
     frag = Fragment(kind="demo", payload={"source": "bootstrap"})
     frame.add(frag)
 
     if hasattr(frames_store, "add"):
         frames_store.add(frame)
-    elif hasattr(frames_store, "append"):
-        frames_store.append(frame)
-    elif hasattr(frames_store, "store"):
-        frames_store.store.append(frame)
+    elif hasattr(frames_store, "frames") and isinstance(frames_store.frames, list):
+        frames_store.frames.append(frame)
 
     return frame
 
@@ -140,14 +164,8 @@ def inject_demo_frame(state):
 def add_fragment_to_last_frame(state):
     frames_store = state["frames_store"]
 
-    if hasattr(frames_store, "frames"):
-        frames = frames_store.frames
-    elif hasattr(frames_store, "store"):
-        frames = frames_store.store
-    else:
-        return None
-
-    if not frames:
+    frames = getattr(frames_store, "frames", [])
+    if not isinstance(frames, list) or not frames:
         return None
 
     frag = Fragment(kind="demo", payload={"source": "bootstrap"})
