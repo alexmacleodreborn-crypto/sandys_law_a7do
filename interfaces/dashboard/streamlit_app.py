@@ -1,16 +1,24 @@
-# interfaces/dashboard/streamlit_app.py
+# sandys_law_a7do/interfaces/dashboard/streamlit_app.py
 """
 A7DO — Sandy’s Law Dashboard
-v1.1 with Sidebar Menu + Memory Visibility
+v1.1 — Menu + Memory Visibility
 """
 
 import streamlit as st
 
+# --------------------------------------------------
+# IMPORTANT:
+# Always import through the PACKAGE
+# --------------------------------------------------
+from sandys_law_a7do.bootstrap import (
+    inject_demo_frame,
+    add_fragment_by_kind,
+    close_frame,
+    tick_system,
+)
+
 
 def main(snapshot):
-    # --------------------------------------------------
-    # Page config
-    # --------------------------------------------------
     st.set_page_config(
         page_title="A7DO — Sandy’s Law Dashboard",
         layout="wide",
@@ -25,52 +33,28 @@ def main(snapshot):
 
     st.sidebar.markdown("### Frame Controls")
 
-    # Lazy imports to avoid circulars
-    from bootstrap import (
-        inject_demo_frame,
-        add_fragment,
-        close_frame,
-        tick_system,
-    )
-
-    # Build a stable state reference
-    data = snapshot()
-    state = snapshot.__closure__[0].cell_contents if snapshot.__closure__ else None
-
-    # NOTE:
-    # We do NOT mutate state here directly; actions call bootstrap helpers
+    # Get access to the shared state via snapshot closure
+    state = snapshot.__closure__[0].cell_contents
 
     if st.sidebar.button("▶ Open Demo Frame"):
-        try:
-            inject_demo_frame(state)
-        except Exception as e:
-            st.sidebar.warning(str(e))
+        inject_demo_frame(state)
 
     if st.sidebar.button("➕ Add Fragment"):
-        try:
-            add_fragment(state)
-        except Exception as e:
-            st.sidebar.warning(str(e))
+        add_fragment_by_kind(state, "demo")
 
     if st.sidebar.button("⏹ Close Frame"):
-        try:
-            close_frame(state)
-        except Exception as e:
-            st.sidebar.warning(str(e))
+        close_frame(state)
 
     st.sidebar.divider()
 
     if st.sidebar.button("⏱ Tick"):
-        try:
-            tick_system(state)
-        except Exception as e:
-            st.sidebar.warning(str(e))
+        tick_system(state)
 
     st.sidebar.divider()
     st.sidebar.markdown("### Status")
 
     # --------------------------------------------------
-    # Pull fresh snapshot after actions
+    # Pull fresh snapshot
     # --------------------------------------------------
     data = snapshot()
 
@@ -82,7 +66,6 @@ def main(snapshot):
     st.json(
         {
             "ticks": data["ticks"],
-            "roles": data.get("roles", []),
             "active_frame": (
                 {
                     "domain": data["active_frame"].domain,
@@ -131,13 +114,13 @@ def main(snapshot):
 
     if memory_count > 0:
         st.success(
-            "Memory crystallising: system has remained inside allowed region "
+            "Memory crystallising: system remained inside allowed region "
             "long enough to persist structure."
         )
     else:
         st.info(
-            "No memory crystallised yet. "
-            "System is either outside regulation gates or has not remained stable long enough."
+            "No memory crystallised yet "
+            "(outside gates or insufficient persistence)."
         )
 
     # ==================================================
@@ -155,13 +138,3 @@ def main(snapshot):
             st.code(f"{i}: {frag.kind}")
     else:
         st.info("No active frame")
-
-
-# --------------------------------------------------
-# Entry point (for direct run)
-# --------------------------------------------------
-if __name__ == "__main__":
-    from bootstrap import build_system
-
-    _, snapshot, _ = build_system()
-    main(snapshot)
