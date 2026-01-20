@@ -1,7 +1,7 @@
 # bootstrap.py
 """
-A7DO + Sandy's Law
-System Bootstrap (FINAL, CONTRACT-CORRECT)
+A7DO + Sandy’s Law
+System Bootstrap (FINAL, CONTRACT-CORRECT, EXPERIMENT-READY)
 """
 
 from roles.system_manager import SystemManager
@@ -35,19 +35,21 @@ def build_system():
     preferences = PreferenceEngine()
 
     ticks = 0
-    last_closed_frame = None  # for inspection
+    last_closed_frame = None
 
+    # -----------------------------------------------------
+    # ROLES
+    # -----------------------------------------------------
     system = SystemManager()
     sled = SLEDInterface()
     system.register(sled)
 
     # -----------------------------------------------------
-    # SNAPSHOT (READ-ONLY)
+    # SNAPSHOT (READ-ONLY VIEW)
     # -----------------------------------------------------
     def snapshot():
         nonlocal ticks, last_closed_frame
 
-        # Collect fragments from active + last closed frame
         frames = []
         if frames_store.active:
             frames.append(frames_store.active)
@@ -62,7 +64,7 @@ def build_system():
 
         percept = summarize_perception(fragments)
 
-        # --- Boundary → block proxy ---
+        # --- Boundary → blocking proxy ---
         hard_pressure = getattr(boundaries, "hard_pressure", 0.0)
         blocked_events = int(hard_pressure * 10)
 
@@ -102,14 +104,17 @@ def build_system():
             },
         }
 
+    # -----------------------------------------------------
+    # STATE HANDLE (UI SAFE)
+    # -----------------------------------------------------
     state = {
         "frames_store": frames_store,
         "boundaries": boundaries,
         "memory": memory,
         "preferences": preferences,
         "_get_ticks": lambda: ticks,
-        "_set_ticks": lambda v: None,
-        "_set_last_frame": lambda f: None,
+        "_set_ticks": None,
+        "_set_last_frame": None,
     }
 
     def _set_ticks(v):
@@ -127,7 +132,7 @@ def build_system():
 
 
 # =========================================================
-# CONTROLLED ACTIONS (UI CALLABLE)
+# CONTROLLED ACTIONS (UI / EXPERIMENT CALLABLE)
 # =========================================================
 
 def inject_demo_frame(state):
@@ -146,11 +151,22 @@ def inject_demo_frame(state):
 
 def add_fragment(state):
     """
-    Add a demo fragment to active frame.
+    Add a demo fragment to the active frame.
     """
     frames_store = state["frames_store"]
 
     frag = Fragment(kind="demo", payload={"source": "ui"})
+    frames_store.add_fragment(frag)
+    return frag
+
+
+def add_fragment_by_kind(state, kind: str):
+    """
+    Add a fragment of a specific kind (used by experiments).
+    """
+    frames_store = state["frames_store"]
+
+    frag = Fragment(kind=kind, payload={"source": "experiment"})
     frames_store.add_fragment(frag)
     return frag
 
