@@ -1,17 +1,22 @@
 # streamlit_app.py
-"""
-Streamlit Cloud entry point (SAFE).
-"""
 
 import streamlit as st
 
 
 def run():
-    # Lazy imports ONLY after Streamlit is ready
-    from bootstrap import build_system
+    from bootstrap import build_system, inject_demo_frame, tick_system
     from interfaces.dashboard.streamlit_app import main as dashboard_main
 
-    _, snapshot = build_system()
+    system, snapshot, state = build_system()
+
+    st.sidebar.header("Controls")
+
+    if st.sidebar.button("➕ Inject Demo Frame"):
+        inject_demo_frame(state)
+
+    if st.sidebar.button("▶ Tick"):
+        tick_system(state)
+
     dashboard_main(snapshot)
 
 
