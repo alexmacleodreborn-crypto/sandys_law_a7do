@@ -1,7 +1,7 @@
 # interfaces/dashboard/streamlit_app.py
 """
 A7DO — Sandy’s Law Dashboard
-v1.1: Memory visibility added (read-only)
+v1.1 with Sidebar Menu + Memory Visibility
 """
 
 import streamlit as st
@@ -12,14 +12,65 @@ def main(snapshot):
     # Page config
     # --------------------------------------------------
     st.set_page_config(
-        page_title="A7DO — Sandy’s Law System Dashboard",
+        page_title="A7DO — Sandy’s Law Dashboard",
         layout="wide",
     )
 
     st.title("A7DO — Sandy’s Law System Dashboard")
 
     # --------------------------------------------------
-    # Pull system snapshot
+    # Sidebar menu
+    # --------------------------------------------------
+    st.sidebar.title("A7DO Control Panel")
+
+    st.sidebar.markdown("### Frame Controls")
+
+    # Lazy imports to avoid circulars
+    from bootstrap import (
+        inject_demo_frame,
+        add_fragment,
+        close_frame,
+        tick_system,
+    )
+
+    # Build a stable state reference
+    data = snapshot()
+    state = snapshot.__closure__[0].cell_contents if snapshot.__closure__ else None
+
+    # NOTE:
+    # We do NOT mutate state here directly; actions call bootstrap helpers
+
+    if st.sidebar.button("▶ Open Demo Frame"):
+        try:
+            inject_demo_frame(state)
+        except Exception as e:
+            st.sidebar.warning(str(e))
+
+    if st.sidebar.button("➕ Add Fragment"):
+        try:
+            add_fragment(state)
+        except Exception as e:
+            st.sidebar.warning(str(e))
+
+    if st.sidebar.button("⏹ Close Frame"):
+        try:
+            close_frame(state)
+        except Exception as e:
+            st.sidebar.warning(str(e))
+
+    st.sidebar.divider()
+
+    if st.sidebar.button("⏱ Tick"):
+        try:
+            tick_system(state)
+        except Exception as e:
+            st.sidebar.warning(str(e))
+
+    st.sidebar.divider()
+    st.sidebar.markdown("### Status")
+
+    # --------------------------------------------------
+    # Pull fresh snapshot after actions
     # --------------------------------------------------
     data = snapshot()
 
@@ -64,7 +115,6 @@ def main(snapshot):
     # REGULATION
     # ==================================================
     st.subheader("Regulation")
-
     st.json(data["regulation"])
 
     # ==================================================
@@ -97,7 +147,6 @@ def main(snapshot):
 
     if data["active_frame"]:
         frame = data["active_frame"]
-
         st.write(f"**Domain:** {frame.domain}")
         st.write(f"**Label:** {frame.label}")
         st.write(f"**Fragments:** {len(frame.fragments)}")
@@ -109,7 +158,7 @@ def main(snapshot):
 
 
 # --------------------------------------------------
-# Entry point
+# Entry point (for direct run)
 # --------------------------------------------------
 if __name__ == "__main__":
     from bootstrap import build_system
