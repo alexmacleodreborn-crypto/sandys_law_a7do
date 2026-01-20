@@ -1,73 +1,76 @@
 # sandys_law_a7do/interfaces/dashboard/dashboard_ui.py
+"""
+A7DO — Sandy’s Law Dashboard UI
+Render-only module (Option A: relative imports)
+"""
 
 import streamlit as st
 import matplotlib.pyplot as plt
 
-from sandys_law_a7do.bootstrap import (
+# RELATIVE IMPORTS (CRITICAL)
+from ...bootstrap import (
     inject_demo_frame,
     add_fragment_by_kind,
     close_frame,
     tick_system,
 )
 
+
 # =====================================================
 # DASHBOARD RENDER
 # =====================================================
 
 def render_dashboard(state, snapshot):
-   
+    data = snapshot()
+    metrics = data["metrics"]
+
     st.title("A7DO — Sandy’s Law System Dashboard")
 
     # -------------------------------------------------
-    # SNAPSHOT
+    # SYSTEM OVERVIEW
     # -------------------------------------------------
-    data = snapshot()
-
     st.subheader("System Overview")
-    st.json({
-        "ticks": data["ticks"],
-        "active_frame": (
-            f"{data['active_frame'].domain}:{data['active_frame'].label}"
-            if data["active_frame"] else "none"
-        ),
-        "memory_count": data["memory_count"],
-    })
+    st.json(
+        {
+            "ticks": data["ticks"],
+            "active_frame": (
+                f"{data['active_frame'].domain}:{data['active_frame'].label}"
+                if data["active_frame"]
+                else "none"
+            ),
+            "memory_count": data["memory_count"],
+        }
+    )
 
     # -------------------------------------------------
     # METRICS
     # -------------------------------------------------
-    metrics = data["metrics"]
-
     st.subheader("Metrics")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Z (Fragmentation)", round(metrics["Z"], 3))
-    col2.metric("Coherence", round(metrics["Coherence"], 3))
-    col3.metric("Stability", round(metrics["Stability"], 3))
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Z (Fragmentation)", round(metrics["Z"], 3))
+    c2.metric("Coherence", round(metrics["Coherence"], 3))
+    c3.metric("Stability", round(metrics["Stability"], 3))
 
     # -------------------------------------------------
     # CONTROLS
     # -------------------------------------------------
     st.subheader("Controls")
-    c1, c2, c3, c4 = st.columns(4)
+    b1, b2, b3, b4 = st.columns(4)
 
-    with c1:
-        if st.button("🆕 New Frame"):
-            inject_demo_frame(state)
+    if b1.button("🆕 New Frame"):
+        inject_demo_frame(state)
 
-    with c2:
-        if st.button("➕ Add Fragment"):
-            add_fragment_by_kind(state, "demo")
+    if b2.button("➕ Add Fragment"):
+        add_fragment_by_kind(state, "demo")
 
-    with c3:
-        if st.button("⏹ Close Frame"):
-            close_frame(state)
+    if b3.button("⏹ Close Frame"):
+        close_frame(state)
 
-    with c4:
-        if st.button("⏭ Tick"):
-            tick_system(state)
+    if b4.button("⏭ Tick"):
+        tick_system(state)
 
     # -------------------------------------------------
-    # METRIC HISTORY (UNCHANGED)
+    # METRIC HISTORY (PRESERVE EXISTING BEHAVIOUR)
     # -------------------------------------------------
     if "history" not in state:
         state["history"] = {
@@ -92,22 +95,21 @@ def render_dashboard(state, snapshot):
     ax.plot(
         state["history"]["ticks"],
         state["history"]["Z"],
-        label="Z (Fragmentation)"
+        label="Z (Fragmentation)",
     )
     ax.plot(
         state["history"]["ticks"],
         state["history"]["Coherence"],
-        label="Coherence"
+        label="Coherence",
     )
     ax.plot(
         state["history"]["ticks"],
         state["history"]["Stability"],
-        label="Stability"
+        label="Stability",
     )
 
-    # 🔹 Crystallisation overlay (EVENT, not metric)
-    cryst_ticks = state.get("crystallisation_ticks", [])
-    for i, t in enumerate(cryst_ticks):
+    # Crystallisation markers (event-based)
+    for i, t in enumerate(state.get("crystallisation_ticks", [])):
         ax.axvline(
             x=t,
             linestyle="--",
