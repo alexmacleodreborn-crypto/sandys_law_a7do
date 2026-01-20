@@ -1,31 +1,42 @@
 # sandys_law_a7do/streamlit_app.py
 """
-Streamlit entry point for A7DO
-
-This file MUST import the package, not local files.
+A7DO — Sandy’s Law
+SINGLE Streamlit entry point
 """
 
-import sys
-from pathlib import Path
+import streamlit as st
 
-# --------------------------------------------------
-# Ensure project root is on PYTHONPATH
-# --------------------------------------------------
-ROOT = Path(__file__).resolve().parent
-if str(ROOT.parent) not in sys.path:
-    sys.path.insert(0, str(ROOT.parent))
-
-# --------------------------------------------------
-# Import via package (CRITICAL)
-# --------------------------------------------------
 from sandys_law_a7do.bootstrap import build_system
-from sandys_law_a7do.interfaces.dashboard.streamlit_app import main
+from sandys_law_a7do.interfaces.dashboard.dashboard_ui import render_dashboard
 
 
-def run():
-    _, snapshot, _ = build_system()
-    main(snapshot)
+# --------------------------------------------------
+# INIT SYSTEM ONCE
+# --------------------------------------------------
+
+if "a7do_state" not in st.session_state:
+    _, snapshot, state = build_system()
+    st.session_state.a7do_state = state
+    st.session_state.snapshot_fn = snapshot
+
+state = st.session_state.a7do_state
+snapshot = st.session_state.snapshot_fn
 
 
-if __name__ == "__main__":
-    run()
+# --------------------------------------------------
+# STREAMLIT SETUP
+# --------------------------------------------------
+
+st.set_page_config(
+    page_title="A7DO — Sandy’s Law",
+    layout="wide",
+)
+
+st.title("A7DO — Sandy’s Law System Dashboard")
+
+
+# --------------------------------------------------
+# RENDER UI
+# --------------------------------------------------
+
+render_dashboard(state, snapshot)
