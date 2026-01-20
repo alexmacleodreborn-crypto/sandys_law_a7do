@@ -1,12 +1,20 @@
 # streamlit_app.py
 """
 A7DO + Sandy’s Law
-Streamlit Interface — Experiment Comparison Mode
+Streamlit Interface — Experiment Comparison with Regulation Thresholds
 """
 
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+
+
+# --------------------------------------------------
+# Regulation thresholds (authoritative)
+# --------------------------------------------------
+Z_MAX = 0.6             # above this → fragmentation regime
+COHERENCE_MIN = 0.7     # below this → unstable / block
+STABILITY_MIN = 0.7
 
 
 def run():
@@ -16,7 +24,6 @@ def run():
     from bootstrap import (
         build_system,
         inject_demo_frame,
-        add_fragment,
         add_fragment_by_kind,
         close_frame,
         tick_system,
@@ -48,10 +55,10 @@ def run():
     # Page setup
     # --------------------------------------------------
     st.set_page_config(
-        page_title="A7DO — Sandy’s Law Comparison",
+        page_title="A7DO — Sandy’s Law Regulation Thresholds",
         layout="wide",
     )
-    st.title("A7DO — Sandy’s Law Experiment Comparison")
+    st.title("A7DO — Sandy’s Law: Regulation Thresholds")
 
     # --------------------------------------------------
     # Sidebar: experiments
@@ -95,41 +102,12 @@ def run():
         experiments.clear()
 
     # --------------------------------------------------
-    # Snapshot overview
-    # --------------------------------------------------
-    data = snapshot()
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("System State")
-        st.json(
-            {
-                "roles": data["roles"],
-                "ticks": data["ticks"],
-                "active_frame": (
-                    {
-                        "domain": data["active_frame"].domain,
-                        "label": data["active_frame"].label,
-                        "fragments": len(data["active_frame"].fragments),
-                    }
-                    if data["active_frame"]
-                    else None
-                ),
-            }
-        )
-
-    with col2:
-        st.subheader("Regulation")
-        st.json(data["regulation"])
-
-    # --------------------------------------------------
-    # Comparison plots
+    # Comparison plots with gates
     # --------------------------------------------------
     if experiments:
-        st.subheader("Metric Comparison Across Experiments")
+        st.subheader("Metric Comparison Across Experiments (with Gates)")
 
-        fig, axes = plt.subplots(3, 1, figsize=(8, 10), sharex=True)
+        fig, axes = plt.subplots(3, 1, figsize=(9, 11), sharex=True)
 
         for name, exp in experiments.items():
             rows = []
@@ -148,6 +126,30 @@ def run():
             axes[1].plot(df["Tick"], df["Coherence"], label=name)
             axes[2].plot(df["Tick"], df["Stability"], label=name)
 
+        # -----------------------------
+        # Regulation threshold lines
+        # -----------------------------
+        axes[0].axhline(
+            Z_MAX, linestyle="--", color="red", alpha=0.7, label="Z_max (fragmentation)"
+        )
+        axes[1].axhline(
+            COHERENCE_MIN,
+            linestyle="--",
+            color="orange",
+            alpha=0.7,
+            label="Coherence_min",
+        )
+        axes[2].axhline(
+            STABILITY_MIN,
+            linestyle="--",
+            color="orange",
+            alpha=0.7,
+            label="Stability_min",
+        )
+
+        # -----------------------------
+        # Formatting
+        # -----------------------------
         axes[0].set_ylabel("Z (Fragmentation)")
         axes[1].set_ylabel("Coherence")
         axes[2].set_ylabel("Stability")
@@ -161,7 +163,7 @@ def run():
         st.pyplot(fig)
 
     # --------------------------------------------------
-    # Experiment summaries
+    # Final states
     # --------------------------------------------------
     if experiments:
         st.subheader("Final States")
