@@ -1,10 +1,11 @@
 # sandys_law_a7do/interfaces/dashboard/dashboard_ui.py
 """
-Dashboard UI — PURE rendering logic
-NO Streamlit app initialisation
+A7DO — Sandy’s Law Dashboard UI
+FINAL serialisation-safe version
 """
 
 import streamlit as st
+from dataclasses import asdict
 
 from sandys_law_a7do.bootstrap import (
     inject_demo_frame,
@@ -24,11 +25,13 @@ def render_dashboard(state, snapshot):
     st.sidebar.markdown("### Frame Lifecycle")
 
     if st.sidebar.button("▶ New Frame"):
+        # Enforce single-frame invariant
         if state["frames"].active is not None:
             close_frame(state)
         inject_demo_frame(state)
 
     if st.sidebar.button("➕ Add Fragment"):
+        # Ensure frame exists
         if state["frames"].active is None:
             inject_demo_frame(state)
         add_fragment_by_kind(state, "demo")
@@ -37,6 +40,10 @@ def render_dashboard(state, snapshot):
         close_frame(state)
 
     st.sidebar.divider()
+
+    # --------------------------------------------------
+    # TICK (OBSERVATIONAL ONLY)
+    # --------------------------------------------------
 
     if st.sidebar.button("⏱ Tick"):
         tick_system(state)
@@ -48,7 +55,7 @@ def render_dashboard(state, snapshot):
     data = snapshot()
 
     # ==================================================
-    # OVERVIEW
+    # SYSTEM OVERVIEW
     # ==================================================
 
     st.subheader("System Overview")
@@ -86,11 +93,16 @@ def render_dashboard(state, snapshot):
     st.caption(f"Stability: {metrics['Stability']:.3f}")
 
     # ==================================================
-    # REGULATION
+    # REGULATION (SAFE SERIALISATION)
     # ==================================================
 
     st.subheader("Regulation Decision")
-    st.json(data["regulation"])
+
+    reg = data["regulation"]
+    if hasattr(reg, "__dataclass_fields__"):
+        st.json(asdict(reg))
+    else:
+        st.json(reg)
 
     # ==================================================
     # MEMORY
@@ -103,6 +115,11 @@ def render_dashboard(state, snapshot):
         value=data["memory_count"],
     )
 
+    if data["memory_count"] > 0:
+        st.success("Memory crystallised under stable conditions")
+    else:
+        st.info("No crystallised memory yet")
+
     # ==================================================
     # FRAME INSPECTOR
     # ==================================================
@@ -111,6 +128,10 @@ def render_dashboard(state, snapshot):
 
     if data["active_frame"]:
         frame = data["active_frame"]
+        st.write(f"**Domain:** {frame.domain}")
+        st.write(f"**Label:** {frame.label}")
+        st.write(f"**Fragments:** {len(frame.fragments)}")
+
         for i, frag in enumerate(frame.fragments):
             st.code(f"{i}: {frag.kind}")
     else:
