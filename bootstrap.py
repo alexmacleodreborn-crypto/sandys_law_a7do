@@ -3,7 +3,7 @@
 Bootstrap — v1.1
 Structural Regulation Core (v1.0) + Gated Memory (v1.1)
 
-Correctly consumes CoherenceReport objects from mind.coherence
+Aligned exactly with mind/coherence.py
 """
 
 # =====================================================
@@ -76,7 +76,7 @@ def system_snapshot(state: dict) -> dict:
         unique_actions = 0
 
     # --------------------------------------------------
-    # CoherenceReport (OBJECT, not dict)
+    # CoherenceReport (source of truth)
     # --------------------------------------------------
     report: CoherenceReport = compute_coherence(
         fragment_count=fragment_count,
@@ -85,11 +85,11 @@ def system_snapshot(state: dict) -> dict:
     )
 
     # --------------------------------------------------
-    # Extract attributes (single source of truth)
+    # Sandy’s Law metric mapping
     # --------------------------------------------------
-    Z = float(report.z)
+    Z = float(report.fragmentation)
     coherence = float(report.coherence)
-    stability = float(report.stability)
+    stability = coherence * (1.0 - float(report.block_rate))
 
     # --------------------------------------------------
     # Regulation (v1.0 frozen)
@@ -97,7 +97,7 @@ def system_snapshot(state: dict) -> dict:
     regulation = regulate(
         coherence=coherence,
         fragmentation=Z,
-        block_rate=0.0,
+        block_rate=report.block_rate,
     )
 
     return {
