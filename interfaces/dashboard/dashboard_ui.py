@@ -15,7 +15,7 @@ from sandys_law_a7do.bootstrap import (
 # =====================================================
 
 def render_dashboard(state, snapshot):
-    st.set_page_config(page_title="A7DO — Sandy’s Law", layout="wide")
+   
     st.title("A7DO — Sandy’s Law System Dashboard")
 
     # -------------------------------------------------
