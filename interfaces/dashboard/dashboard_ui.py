@@ -1,7 +1,7 @@
 # sandys_law_a7do/interfaces/dashboard/dashboard_ui.py
 """
 A7DO — Sandy’s Law Dashboard UI
-Adds Stability Timeline Plot (v1.1)
+Adds crystallisation markers to stability timeline (v1.2)
 """
 
 import streamlit as st
@@ -17,18 +17,23 @@ from sandys_law_a7do.bootstrap import (
 
 def render_dashboard(state, snapshot):
     # ==================================================
-    # SESSION STORAGE FOR TIMELINE (UI-ONLY)
+    # SESSION STATE (UI-ONLY)
     # ==================================================
 
     if "timeline" not in st.session_state:
         st.session_state.timeline = []
+
+    if "last_memory_count" not in st.session_state:
+        st.session_state.last_memory_count = 0
+
+    if "crystallisation_ticks" not in st.session_state:
+        st.session_state.crystallisation_ticks = []
 
     # ==================================================
     # SIDEBAR CONTROLS
     # ==================================================
 
     st.sidebar.title("A7DO Control Panel")
-
     st.sidebar.markdown("### Frame Lifecycle")
 
     if st.sidebar.button("▶ New Frame"):
@@ -49,9 +54,9 @@ def render_dashboard(state, snapshot):
     if st.sidebar.button("⏱ Tick"):
         tick_system(state)
 
-    # --------------------------------------------------
-    # SNAPSHOT AFTER ACTIONS
-    # --------------------------------------------------
+    # ==================================================
+    # SNAPSHOT
+    # ==================================================
 
     data = snapshot()
     metrics = data["metrics"]
@@ -69,9 +74,16 @@ def render_dashboard(state, snapshot):
         }
     )
 
-    # Limit memory to last N ticks (UI only)
-    MAX_POINTS = 100
-    st.session_state.timeline = st.session_state.timeline[-MAX_POINTS:]
+    st.session_state.timeline = st.session_state.timeline[-200:]
+
+    # --------------------------------------------------
+    # DETECT CRYSTALLISATION EVENT
+    # --------------------------------------------------
+
+    if data["memory_count"] > st.session_state.last_memory_count:
+        st.session_state.crystallisation_ticks.append(data["ticks"])
+
+    st.session_state.last_memory_count = data["memory_count"]
 
     # ==================================================
     # SYSTEM OVERVIEW
@@ -110,27 +122,32 @@ def render_dashboard(state, snapshot):
     st.caption(f"Stability: {metrics['Stability']:.3f}")
 
     # ==================================================
-    # STABILITY TIMELINE (NEW)
+    # STABILITY TIMELINE WITH CRYSTALLISATION MARKERS
     # ==================================================
 
-    st.subheader("Stability Timeline")
+    st.subheader("Stability Timeline (Crystallisation Highlighted)")
 
     timeline = st.session_state.timeline
 
     if len(timeline) > 1:
-        st.line_chart(
-            {
-                "Z": [p["Z"] for p in timeline],
-                "Coherence": [p["Coherence"] for p in timeline],
-                "Stability": [p["Stability"] for p in timeline],
-            }
-        )
-        st.caption("Z (fragmentation), Coherence, and Stability over ticks")
+        import pandas as pd
+
+        df = pd.DataFrame(timeline).set_index("tick")
+
+        st.line_chart(df[["Z", "Coherence", "Stability"]])
+
+        if st.session_state.crystallisation_ticks:
+            st.caption(
+                f"Crystallisation occurred at ticks: "
+                f"{st.session_state.crystallisation_ticks}"
+            )
+            st.success("Vertical markers correspond to memory crystallisation events")
+
     else:
         st.info("Tick the system to build a timeline")
 
     # ==================================================
-    # REGULATION (SAFE SERIALISATION)
+    # REGULATION
     # ==================================================
 
     st.subheader("Regulation Decision")
@@ -142,7 +159,7 @@ def render_dashboard(state, snapshot):
         st.json(reg)
 
     # ==================================================
-    # MEMORY SUMMARY
+    # MEMORY
     # ==================================================
 
     st.subheader("Structural Memory")
@@ -158,17 +175,14 @@ def render_dashboard(state, snapshot):
 
     st.subheader("Recent Memory Traces")
 
-    memory = state["memory"]
-    traces = memory.all()
+    traces = state["memory"].all()
 
     if not traces:
         st.info("No crystallised memory yet")
     else:
         recent = traces[-5:]
-
-        table = []
-        for t in recent:
-            table.append(
+        st.table(
+            [
                 {
                     "tick": t.tick,
                     "Z": round(t.Z, 3),
@@ -177,9 +191,9 @@ def render_dashboard(state, snapshot):
                     "frame": t.frame_signature,
                     "weight": round(t.weight, 3),
                 }
-            )
-
-        st.table(table)
+                for t in recent
+            ]
+        )
 
     # ==================================================
     # FRAME INSPECTOR
