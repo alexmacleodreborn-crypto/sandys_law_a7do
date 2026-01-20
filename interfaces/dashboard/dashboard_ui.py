@@ -1,7 +1,7 @@
 # sandys_law_a7do/interfaces/dashboard/dashboard_ui.py
 """
 A7DO — Sandy’s Law Dashboard UI
-FINAL serialisation-safe version
+Includes recent MemoryTrace inspection
 """
 
 import streamlit as st
@@ -25,13 +25,11 @@ def render_dashboard(state, snapshot):
     st.sidebar.markdown("### Frame Lifecycle")
 
     if st.sidebar.button("▶ New Frame"):
-        # Enforce single-frame invariant
         if state["frames"].active is not None:
             close_frame(state)
         inject_demo_frame(state)
 
     if st.sidebar.button("➕ Add Fragment"):
-        # Ensure frame exists
         if state["frames"].active is None:
             inject_demo_frame(state)
         add_fragment_by_kind(state, "demo")
@@ -40,10 +38,6 @@ def render_dashboard(state, snapshot):
         close_frame(state)
 
     st.sidebar.divider()
-
-    # --------------------------------------------------
-    # TICK (OBSERVATIONAL ONLY)
-    # --------------------------------------------------
 
     if st.sidebar.button("⏱ Tick"):
         tick_system(state)
@@ -105,7 +99,7 @@ def render_dashboard(state, snapshot):
         st.json(reg)
 
     # ==================================================
-    # MEMORY
+    # MEMORY SUMMARY
     # ==================================================
 
     st.subheader("Structural Memory")
@@ -115,10 +109,36 @@ def render_dashboard(state, snapshot):
         value=data["memory_count"],
     )
 
-    if data["memory_count"] > 0:
-        st.success("Memory crystallised under stable conditions")
-    else:
+    # ==================================================
+    # RECENT MEMORY TRACES (NEW)
+    # ==================================================
+
+    st.subheader("Recent Memory Traces")
+
+    memory = state["memory"]
+    traces = memory.all()
+
+    if not traces:
         st.info("No crystallised memory yet")
+    else:
+        # Show last N traces
+        N = 5
+        recent = traces[-N:]
+
+        table = []
+        for t in recent:
+            table.append(
+                {
+                    "tick": t.tick,
+                    "Z": round(t.Z, 3),
+                    "coherence": round(t.coherence, 3),
+                    "stability": round(t.stability, 3),
+                    "frame": t.frame_signature,
+                    "weight": round(t.weight, 3),
+                }
+            )
+
+        st.table(table)
 
     # ==================================================
     # FRAME INSPECTOR
