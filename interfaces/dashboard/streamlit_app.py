@@ -1,143 +1,164 @@
 # sandys_law_a7do/interfaces/dashboard/streamlit_app.py
 """
 A7DO — Sandy’s Law Dashboard
-v1.1 — Menu + Memory Visibility
+FINAL frame-safe version
+
+Rules enforced:
+- Exactly ONE active frame
+- Tick is observational only
+- UI enforces frame lifecycle
 """
 
 import streamlit as st
 
-# --------------------------------------------------
-# IMPORTANT:
-# Always import through the PACKAGE
-# --------------------------------------------------
 from sandys_law_a7do.bootstrap import (
+    build_system,
     inject_demo_frame,
     add_fragment_by_kind,
     close_frame,
     tick_system,
 )
 
+# --------------------------------------------------
+# INIT SYSTEM (ONCE)
+# --------------------------------------------------
 
-def main(snapshot):
-    st.set_page_config(
-        page_title="A7DO — Sandy’s Law Dashboard",
-        layout="wide",
-    )
+if "a7do_state" not in st.session_state:
+    _, snapshot, state = build_system()
+    st.session_state.a7do_state = state
+    st.session_state.snapshot_fn = snapshot
 
-    st.title("A7DO — Sandy’s Law System Dashboard")
+state = st.session_state.a7do_state
+snapshot = st.session_state.snapshot_fn
 
-    # --------------------------------------------------
-    # Sidebar menu
-    # --------------------------------------------------
-    st.sidebar.title("A7DO Control Panel")
 
-    st.sidebar.markdown("### Frame Controls")
+# --------------------------------------------------
+# UI
+# --------------------------------------------------
 
-    # Get access to the shared state via snapshot closure
-    state = snapshot.__closure__[0].cell_contents
+st.set_page_config(
+    page_title="A7DO — Sandy’s Law Dashboard",
+    layout="wide",
+)
 
-    if st.sidebar.button("▶ New Frame"):
-    # Enforce single-frame invariant
+st.title("A7DO — Sandy’s Law System Dashboard")
+
+# ==================================================
+# SIDEBAR CONTROLS
+# ==================================================
+
+st.sidebar.title("A7DO Control Panel")
+
+# ------------------------------
+# FRAME CONTROL
+# ------------------------------
+
+st.sidebar.markdown("### Frame Lifecycle")
+
+if st.sidebar.button("▶ New Frame"):
+    # HARD RULE: only one active frame
     if state["frames"].active is not None:
         close_frame(state)
     inject_demo_frame(state)
 
-    if st.sidebar.button("➕ Add Fragment"):
-        add_fragment_by_kind(state, "demo")
+if st.sidebar.button("➕ Add Fragment"):
+    # Ensure a frame exists
+    if state["frames"].active is None:
+        inject_demo_frame(state)
+    add_fragment_by_kind(state, "demo")
 
-    if st.sidebar.button("⏹ Close Frame"):
-        close_frame(state)
+if st.sidebar.button("⏹ Close Frame"):
+    close_frame(state)
 
-    st.sidebar.divider()
+st.sidebar.divider()
 
-    if st.sidebar.button("⏱ Tick"):
-        tick_system(state)
+# ------------------------------
+# TICK (OBSERVATIONAL)
+# ------------------------------
 
-    st.sidebar.divider()
-    st.sidebar.markdown("### Status")
+if st.sidebar.button("⏱ Tick"):
+    tick_system(state)
 
-    # --------------------------------------------------
-    # Pull fresh snapshot
-    # --------------------------------------------------
-    data = snapshot()
+# ==================================================
+# SNAPSHOT (AFTER ALL ACTIONS)
+# ==================================================
 
-    # ==================================================
-    # SYSTEM OVERVIEW
-    # ==================================================
-    st.subheader("System Overview")
+data = snapshot()
 
-    st.json(
-        {
-            "ticks": data["ticks"],
-            "active_frame": (
-                {
-                    "domain": data["active_frame"].domain,
-                    "label": data["active_frame"].label,
-                    "fragments": len(data["active_frame"].fragments),
-                }
-                if data["active_frame"]
-                else None
-            ),
-        }
-    )
+# ==================================================
+# SYSTEM OVERVIEW
+# ==================================================
 
-    # ==================================================
-    # METRICS
-    # ==================================================
-    st.subheader("Metrics")
+st.subheader("System Overview")
 
-    metrics = data["metrics"]
+st.json(
+    {
+        "ticks": data["ticks"],
+        "active_frame": (
+            {
+                "domain": data["active_frame"].domain,
+                "label": data["active_frame"].label,
+                "fragments": len(data["active_frame"].fragments),
+            }
+            if data["active_frame"]
+            else None
+        ),
+    }
+)
 
-    st.progress(float(metrics["Z"]))
-    st.caption(f"Z (Fragmentation): {metrics['Z']:.3f}")
+# ==================================================
+# METRICS
+# ==================================================
 
-    st.progress(float(metrics["Coherence"]))
-    st.caption(f"Coherence: {metrics['Coherence']:.3f}")
+st.subheader("Metrics")
 
-    st.progress(float(metrics["Stability"]))
-    st.caption(f"Stability: {metrics['Stability']:.3f}")
+metrics = data["metrics"]
 
-    # ==================================================
-    # REGULATION
-    # ==================================================
-    st.subheader("Regulation")
-    st.json(data["regulation"])
+st.progress(float(metrics["Z"]))
+st.caption(f"Z (Fragmentation): {metrics['Z']:.3f}")
 
-    # ==================================================
-    # MEMORY (v1.1)
-    # ==================================================
-    st.subheader("Structural Memory")
+st.progress(float(metrics["Coherence"]))
+st.caption(f"Coherence: {metrics['Coherence']:.3f}")
 
-    memory_count = data.get("memory_count", 0)
+st.progress(float(metrics["Stability"]))
+st.caption(f"Stability: {metrics['Stability']:.3f}")
 
-    st.metric(
-        label="Structural Memory Count",
-        value=int(memory_count),
-    )
+# ==================================================
+# REGULATION
+# ==================================================
 
-    if memory_count > 0:
-        st.success(
-            "Memory crystallising: system remained inside allowed region "
-            "long enough to persist structure."
-        )
-    else:
-        st.info(
-            "No memory crystallised yet "
-            "(outside gates or insufficient persistence)."
-        )
+st.subheader("Regulation Decision")
+st.json(data["regulation"])
 
-    # ==================================================
-    # FRAME INSPECTOR
-    # ==================================================
-    st.subheader("Frame Inspector")
+# ==================================================
+# MEMORY
+# ==================================================
 
-    if data["active_frame"]:
-        frame = data["active_frame"]
-        st.write(f"**Domain:** {frame.domain}")
-        st.write(f"**Label:** {frame.label}")
-        st.write(f"**Fragments:** {len(frame.fragments)}")
+st.subheader("Structural Memory")
 
-        for i, frag in enumerate(frame.fragments):
-            st.code(f"{i}: {frag.kind}")
-    else:
-        st.info("No active frame")
+st.metric(
+    label="Crystallised Memory Count",
+    value=data["memory_count"],
+)
+
+if data["memory_count"] > 0:
+    st.success("Memory crystallised under stable conditions")
+else:
+    st.info("No crystallised memory yet")
+
+# ==================================================
+# FRAME INSPECTOR
+# ==================================================
+
+st.subheader("Frame Inspector")
+
+if data["active_frame"]:
+    frame = data["active_frame"]
+    st.write(f"**Domain:** {frame.domain}")
+    st.write(f"**Label:** {frame.label}")
+    st.write(f"**Fragments:** {len(frame.fragments)}")
+
+    for i, frag in enumerate(frame.fragments):
+        st.code(f"{i}: {frag.kind}")
+else:
+    st.info("No active frame")
