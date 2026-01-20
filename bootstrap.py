@@ -3,11 +3,14 @@
 Bootstrap — v1.1
 Structural Regulation Core (v1.0) + Gated Memory (v1.1)
 
-This version fixes metric key alignment with mind/coherence.py
+FINAL robust version:
+- Handles any coherence metric schema
+- Normalises once
+- No hard-coded key assumptions
 """
 
 # =====================================================
-# CORE SYSTEMS (package-relative imports)
+# CORE SYSTEMS
 # =====================================================
 
 from .frames.store import FrameStore
@@ -18,7 +21,7 @@ from .mind.coherence import compute_coherence
 from .mind.regulation import regulate
 
 # =====================================================
-# MEMORY (v1.1 — real API)
+# MEMORY (v1.1)
 # =====================================================
 
 from .memory.trace import MemoryTrace
@@ -59,6 +62,49 @@ def build_system():
 
 
 # =====================================================
+# METRIC NORMALISATION (CRITICAL)
+# =====================================================
+
+def _normalise_metrics(raw: dict) -> dict:
+    """
+    Accepts any reasonable metric schema and returns:
+    {Z, Coherence, Stability}
+    """
+
+    # Possible keys
+    Z = (
+        raw.get("Z")
+        or raw.get("z")
+        or raw.get("fragmentation")
+    )
+
+    coherence = (
+        raw.get("Coherence")
+        or raw.get("coherence")
+        or raw.get("C")
+        or raw.get("c")
+    )
+
+    stability = (
+        raw.get("Stability")
+        or raw.get("stability")
+        or raw.get("S")
+        or raw.get("s")
+    )
+
+    if Z is None or coherence is None or stability is None:
+        raise KeyError(
+            f"Unrecognised metric schema: {raw}"
+        )
+
+    return {
+        "Z": float(Z),
+        "Coherence": float(coherence),
+        "Stability": float(stability),
+    }
+
+
+# =====================================================
 # SNAPSHOT
 # =====================================================
 
@@ -75,32 +121,19 @@ def system_snapshot(state: dict) -> dict:
         fragment_count = 0
         unique_actions = 0
 
-    # --------------------------------------------------
-    # Canonical metrics from mind/coherence (lowercase)
-    # --------------------------------------------------
     raw_metrics = compute_coherence(
         fragment_count=fragment_count,
         unique_actions=unique_actions,
         blocked_events=0,
     )
 
-    # --------------------------------------------------
-    # Regulation uses canonical lowercase keys
-    # --------------------------------------------------
+    metrics = _normalise_metrics(raw_metrics)
+
     regulation = regulate(
-        coherence=raw_metrics["coherence"],
-        fragmentation=raw_metrics["z"],
+        coherence=metrics["Coherence"],
+        fragmentation=metrics["Z"],
         block_rate=0.0,
     )
-
-    # --------------------------------------------------
-    # Normalised metrics for UI / downstream
-    # --------------------------------------------------
-    metrics = {
-        "Z": raw_metrics["z"],
-        "Coherence": raw_metrics["coherence"],
-        "Stability": raw_metrics["stability"],
-    }
 
     return {
         "ticks": state["ticks"],
