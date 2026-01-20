@@ -1,4 +1,4 @@
-# sandys_law_a7do/interfaces/dashboard/streamlit_app.py
+# sandys_law_a7do/interfaces/dashboard/dashboard_ui.py
 
 import streamlit as st
 import matplotlib.pyplot as plt
@@ -11,18 +11,17 @@ from sandys_law_a7do.bootstrap import (
 )
 
 # =====================================================
-# DASHBOARD
+# DASHBOARD RENDER
 # =====================================================
 
-def main(snapshot):
+def render_dashboard(state, snapshot):
     st.set_page_config(page_title="A7DO — Sandy’s Law", layout="wide")
     st.title("A7DO — Sandy’s Law System Dashboard")
 
     # -------------------------------------------------
-    # STATE SNAPSHOT
+    # SNAPSHOT
     # -------------------------------------------------
     data = snapshot()
-    state = st.session_state["state"]
 
     st.subheader("System Overview")
     st.json({
@@ -40,34 +39,35 @@ def main(snapshot):
     metrics = data["metrics"]
 
     st.subheader("Metrics")
-    st.metric("Z (Fragmentation)", round(metrics["Z"], 3))
-    st.metric("Coherence", round(metrics["Coherence"], 3))
-    st.metric("Stability", round(metrics["Stability"], 3))
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Z (Fragmentation)", round(metrics["Z"], 3))
+    col2.metric("Coherence", round(metrics["Coherence"], 3))
+    col3.metric("Stability", round(metrics["Stability"], 3))
 
     # -------------------------------------------------
     # CONTROLS
     # -------------------------------------------------
     st.subheader("Controls")
-    col1, col2, col3, col4 = st.columns(4)
+    c1, c2, c3, c4 = st.columns(4)
 
-    with col1:
+    with c1:
         if st.button("🆕 New Frame"):
             inject_demo_frame(state)
 
-    with col2:
+    with c2:
         if st.button("➕ Add Fragment"):
             add_fragment_by_kind(state, "demo")
 
-    with col3:
+    with c3:
         if st.button("⏹ Close Frame"):
             close_frame(state)
 
-    with col4:
+    with c4:
         if st.button("⏭ Tick"):
             tick_system(state)
 
     # -------------------------------------------------
-    # METRIC EVOLUTION (UNCHANGED + OVERLAY)
+    # METRIC HISTORY (UNCHANGED)
     # -------------------------------------------------
     if "history" not in state:
         state["history"] = {
@@ -77,23 +77,35 @@ def main(snapshot):
             "Stability": [],
         }
 
-    # Append history
     state["history"]["ticks"].append(data["ticks"])
     state["history"]["Z"].append(metrics["Z"])
     state["history"]["Coherence"].append(metrics["Coherence"])
     state["history"]["Stability"].append(metrics["Stability"])
 
+    # -------------------------------------------------
+    # METRIC EVOLUTION + CRYSTALLISATION OVERLAY
+    # -------------------------------------------------
     st.subheader("Metric Evolution")
 
     fig, ax = plt.subplots(figsize=(9, 4))
 
-    ax.plot(state["history"]["ticks"], state["history"]["Z"], label="Z (Fragmentation)")
-    ax.plot(state["history"]["ticks"], state["history"]["Coherence"], label="Coherence")
-    ax.plot(state["history"]["ticks"], state["history"]["Stability"], label="Stability")
+    ax.plot(
+        state["history"]["ticks"],
+        state["history"]["Z"],
+        label="Z (Fragmentation)"
+    )
+    ax.plot(
+        state["history"]["ticks"],
+        state["history"]["Coherence"],
+        label="Coherence"
+    )
+    ax.plot(
+        state["history"]["ticks"],
+        state["history"]["Stability"],
+        label="Stability"
+    )
 
-    # -------------------------------------------------
-    # 🔹 CRYSTALLISATION OVERLAY (NEW — VISUAL ONLY)
-    # -------------------------------------------------
+    # 🔹 Crystallisation overlay (EVENT, not metric)
     cryst_ticks = state.get("crystallisation_ticks", [])
     for i, t in enumerate(cryst_ticks):
         ax.axvline(
