@@ -3,10 +3,7 @@
 Bootstrap — v1.1
 Structural Regulation Core (v1.0) + Gated Memory (v1.1)
 
-FINAL robust version:
-- Handles any coherence metric schema
-- Normalises once
-- No hard-coded key assumptions
+Correctly consumes CoherenceReport objects from mind.coherence
 """
 
 # =====================================================
@@ -17,7 +14,7 @@ from .frames.store import FrameStore
 from .frames.frame import Frame
 from .frames.fragment import Fragment
 
-from .mind.coherence import compute_coherence
+from .mind.coherence import compute_coherence, CoherenceReport
 from .mind.regulation import regulate
 
 # =====================================================
@@ -62,49 +59,6 @@ def build_system():
 
 
 # =====================================================
-# METRIC NORMALISATION (CRITICAL)
-# =====================================================
-
-def _normalise_metrics(raw: dict) -> dict:
-    """
-    Accepts any reasonable metric schema and returns:
-    {Z, Coherence, Stability}
-    """
-
-    # Possible keys
-    Z = (
-        raw.get("Z")
-        or raw.get("z")
-        or raw.get("fragmentation")
-    )
-
-    coherence = (
-        raw.get("Coherence")
-        or raw.get("coherence")
-        or raw.get("C")
-        or raw.get("c")
-    )
-
-    stability = (
-        raw.get("Stability")
-        or raw.get("stability")
-        or raw.get("S")
-        or raw.get("s")
-    )
-
-    if Z is None or coherence is None or stability is None:
-        raise KeyError(
-            f"Unrecognised metric schema: {raw}"
-        )
-
-    return {
-        "Z": float(Z),
-        "Coherence": float(coherence),
-        "Stability": float(stability),
-    }
-
-
-# =====================================================
 # SNAPSHOT
 # =====================================================
 
@@ -121,23 +75,38 @@ def system_snapshot(state: dict) -> dict:
         fragment_count = 0
         unique_actions = 0
 
-    raw_metrics = compute_coherence(
+    # --------------------------------------------------
+    # CoherenceReport (OBJECT, not dict)
+    # --------------------------------------------------
+    report: CoherenceReport = compute_coherence(
         fragment_count=fragment_count,
         unique_actions=unique_actions,
         blocked_events=0,
     )
 
-    metrics = _normalise_metrics(raw_metrics)
+    # --------------------------------------------------
+    # Extract attributes (single source of truth)
+    # --------------------------------------------------
+    Z = float(report.z)
+    coherence = float(report.coherence)
+    stability = float(report.stability)
 
+    # --------------------------------------------------
+    # Regulation (v1.0 frozen)
+    # --------------------------------------------------
     regulation = regulate(
-        coherence=metrics["Coherence"],
-        fragmentation=metrics["Z"],
+        coherence=coherence,
+        fragmentation=Z,
         block_rate=0.0,
     )
 
     return {
         "ticks": state["ticks"],
-        "metrics": metrics,
+        "metrics": {
+            "Z": Z,
+            "Coherence": coherence,
+            "Stability": stability,
+        },
         "regulation": regulation,
         "active_frame": active,
         "memory_count": len(memory.memories),
