@@ -1,129 +1,122 @@
 # streamlit_app.py
 """
 A7DO + Sandy's Law
-Streamlit Interface (FINAL)
+Streamlit Interface with Experiment Mode
 """
 
 import streamlit as st
 
 
 def run():
-    # Lazy imports (Streamlit-safe)
+    # Lazy imports
     from bootstrap import (
         build_system,
         inject_demo_frame,
         add_fragment,
+        add_fragment_by_kind,
         close_frame,
         tick_system,
     )
+    from experiments import (
+        run_experiment,
+        stable_pattern,
+        fragmenting_pattern,
+        overload_pattern,
+    )
 
-    # --------------------------------------------------
-    # PERSIST SYSTEM ACROSS RERUNS
-    # --------------------------------------------------
+    # Persist system
     if "system_bundle" not in st.session_state:
         system, snapshot, state = build_system()
         st.session_state.system_bundle = {
-            "system": system,
             "snapshot": snapshot,
             "state": state,
+            "experiment": None,
         }
 
     bundle = st.session_state.system_bundle
     snapshot = bundle["snapshot"]
     state = bundle["state"]
 
-    # --------------------------------------------------
-    # PAGE SETUP
-    # --------------------------------------------------
-    st.set_page_config(page_title="A7DO Dashboard", layout="wide")
-    st.title("A7DO — Sandy’s Law System")
+    st.set_page_config(page_title="A7DO Experiment Mode", layout="wide")
+    st.title("A7DO — Sandy’s Law Experiment Mode")
 
     # --------------------------------------------------
-    # SIDEBAR CONTROLS
+    # SIDEBAR: EXPERIMENTS
     # --------------------------------------------------
-    st.sidebar.header("Frame Controls")
+    st.sidebar.header("Experiments")
 
-    if st.sidebar.button("▶ Open Demo Frame"):
-        inject_demo_frame(state)
+    if st.sidebar.button("▶ Stable Structure"):
+        bundle["experiment"] = run_experiment(
+            name="Stable",
+            open_frame=lambda: inject_demo_frame(state),
+            add_fragment=lambda k: add_fragment_by_kind(state, k),
+            close_frame=lambda: close_frame(state),
+            tick=lambda: tick_system(state),
+            snapshot=snapshot,
+            pattern=stable_pattern(),
+        )
 
-    if st.sidebar.button("➕ Add Fragment"):
-        try:
-            add_fragment(state)
-        except RuntimeError as e:
-            st.sidebar.warning(str(e))
+    if st.sidebar.button("▶ Fragmenting Structure"):
+        bundle["experiment"] = run_experiment(
+            name="Fragmenting",
+            open_frame=lambda: inject_demo_frame(state),
+            add_fragment=lambda k: add_fragment_by_kind(state, k),
+            close_frame=lambda: close_frame(state),
+            tick=lambda: tick_system(state),
+            snapshot=snapshot,
+            pattern=fragmenting_pattern(),
+        )
 
-    if st.sidebar.button("⏹ Close Frame"):
-        close_frame(state)
-
-    st.sidebar.divider()
-
-    if st.sidebar.button("⏱ Tick"):
-        tick_system(state)
+    if st.sidebar.button("▶ Overload Structure"):
+        bundle["experiment"] = run_experiment(
+            name="Overload",
+            open_frame=lambda: inject_demo_frame(state),
+            add_fragment=lambda k: add_fragment_by_kind(state, k),
+            close_frame=lambda: close_frame(state),
+            tick=lambda: tick_system(state),
+            snapshot=snapshot,
+            pattern=overload_pattern(),
+        )
 
     # --------------------------------------------------
-    # SNAPSHOT VIEW
+    # DISPLAY
     # --------------------------------------------------
     data = snapshot()
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("System State")
-        st.json(
-            {
-                "roles": data["roles"],
-                "ticks": data["ticks"],
-                "active_frame": (
-                    {
-                        "domain": data["active_frame"].domain,
-                        "label": data["active_frame"].label,
-                        "fragments": len(data["active_frame"].fragments),
-                    }
-                    if data["active_frame"]
-                    else None
-                ),
-            }
-        )
+        st.subheader("Current Metrics")
+        for k, v in data["metrics"].items():
+            st.progress(min(1.0, float(v)))
+            st.caption(f"{k}: {float(v):.3f}")
 
     with col2:
         st.subheader("Regulation")
         st.json(data["regulation"])
 
     # --------------------------------------------------
-    # METRICS
+    # EXPERIMENT RESULTS
     # --------------------------------------------------
-    st.subheader("Metrics")
-    for k, v in data["metrics"].items():
-        st.progress(min(1.0, float(v)))
-        st.caption(f"{k}: {float(v):.3f}")
+    exp = bundle.get("experiment")
+    if exp:
+        st.subheader(f"Experiment Result: {exp['name']}")
 
-    # --------------------------------------------------
-    # FRAME INSPECTION
-    # --------------------------------------------------
-    st.subheader("Frames")
+        st.write("Final State")
+        st.json(
+            {
+                "metrics": exp["final"]["metrics"],
+                "regulation": exp["final"]["regulation"],
+            }
+        )
 
-    if data["active_frame"]:
-        with st.expander("Active Frame"):
+        st.write("Timeline")
+        for step in exp["history"]:
             st.write(
-                {
-                    "domain": data["active_frame"].domain,
-                    "label": data["active_frame"].label,
-                    "fragments": [
-                        f.kind for f in data["active_frame"].fragments
-                    ],
-                }
-            )
-
-    if data["last_frame"]:
-        with st.expander("Last Closed Frame"):
-            st.write(
-                {
-                    "domain": data["last_frame"].domain,
-                    "label": data["last_frame"].label,
-                    "fragments": [
-                        f.kind for f in data["last_frame"].fragments
-                    ],
-                }
+                f"Tick {step['ticks']} → "
+                f"Z={step['metrics']['Z']:.2f}, "
+                f"Coherence={step['metrics']['Coherence']:.2f}, "
+                f"Decision={step['regulation']}"
             )
 
 
