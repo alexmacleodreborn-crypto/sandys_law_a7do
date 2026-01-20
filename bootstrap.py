@@ -3,7 +3,7 @@
 Bootstrap — v1.1
 Structural Regulation Core (v1.0) + Gated Memory (v1.1)
 
-Aligned exactly with mind/coherence.py
+FINAL aligned version
 """
 
 # =====================================================
@@ -109,7 +109,7 @@ def system_snapshot(state: dict) -> dict:
         },
         "regulation": regulation,
         "active_frame": active,
-        "memory_count": len(memory.memories),
+        "memory_count": memory.count(),   # ✅ FIXED
     }
 
 
