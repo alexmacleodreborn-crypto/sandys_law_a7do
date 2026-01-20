@@ -5,24 +5,24 @@ Structural Regulation Core (v1.0) + Gated Memory (v1.1)
 """
 
 # =====================================================
-# CORE SYSTEMS
+# CORE SYSTEMS (relative imports)
 # =====================================================
 
-from frames.store import FrameStore
-from frames.frame import Frame
-from frames.fragment import Fragment
+from .frames.store import FrameStore
+from .frames.frame import Frame
+from .frames.fragment import Fragment
 
-from mind.coherence import compute_coherence
-from mind.regulation import regulate
+from .mind.coherence import compute_coherence
+from .mind.regulation import regulate
 
 # =====================================================
-# MEMORY (v1.1)
+# MEMORY (v1.1 — relative imports)
 # =====================================================
 
-from memory.trace import Trace
-from memory.structural_memory import StructuralMemory
-from memory.crystallizer import crystallize
-from memory.decay import decay_memory
+from .memory.trace import Trace
+from .memory.structural_memory import StructuralMemory
+from .memory.crystallizer import crystallize
+from .memory.decay import decay_memory
 
 
 # =====================================================
@@ -108,7 +108,7 @@ def inject_demo_frame(state: dict):
 
 
 def add_fragment_by_kind(state: dict, kind: str):
-    frag = Fragment(kind=kind, payload={"source": "experiment"})
+    frag = Fragment(kind=kind)
     state["frames"].add_fragment(frag)
     return frag
 
