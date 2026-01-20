@@ -1,27 +1,17 @@
-from __future__ import annotations
+# sandys_law_a7do/embodiment/thermal_pain.py
+
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class ThermalSignal:
-    region: str
-    temperature_delta: float
-
-
-@dataclass(frozen=True)
-class PainSignal:
-    region: str
-    intensity: float
-
-
-class ThermalPainProcessor:
+class ThermalPainSignal:
     """
-    Converts raw physical exposure into bodily signals.
+    Represents thermal stress or damage.
     """
+    intensity: float        # [0..1]
+    sustained: bool
+    source: str
 
-    def thermal_to_signal(self, region: str, delta: float) -> ThermalSignal:
-        return ThermalSignal(region=region, temperature_delta=delta)
-
-    def pain_from_contact(self, region: str, force: float) -> PainSignal:
-        intensity = min(1.0, force / 10.0)
-        return PainSignal(region=region, intensity=intensity)
+    @property
+    def harmful(self) -> bool:
+        return self.intensity > 0.6 and self.sustained
