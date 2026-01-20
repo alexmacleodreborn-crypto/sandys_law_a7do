@@ -1,10 +1,10 @@
 import streamlit as st
 
-from sandys_law_a7do.bootstrap import build_system
-from sandys_law_a7do.interfaces.dashboard.dashboard_ui import render_dashboard
+from .bootstrap import build_system
+from .interfaces.dashboard.dashboard_ui import render_dashboard
 
 # --------------------------------------------------
-# STREAMLIT CONFIG — MUST BE HERE AND ONLY HERE
+# STREAMLIT CONFIG (ONLY HERE)
 # --------------------------------------------------
 st.set_page_config(
     page_title="A7DO — Sandy’s Law",
@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # --------------------------------------------------
-# SESSION INITIALISATION (ONCE)
+# SESSION INITIALISATION
 # --------------------------------------------------
 if "initialized" not in st.session_state:
     _, snapshot, state = build_system()
@@ -21,7 +21,7 @@ if "initialized" not in st.session_state:
     st.session_state.initialized = True
 
 # --------------------------------------------------
-# RENDER UI
+# RENDER DASHBOARD
 # --------------------------------------------------
 render_dashboard(
     st.session_state.state,
