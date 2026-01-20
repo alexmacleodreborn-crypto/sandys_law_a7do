@@ -1,7 +1,7 @@
 # sandys_law_a7do/interfaces/dashboard/dashboard_ui.py
 """
 A7DO — Sandy’s Law Dashboard UI
-Includes recent MemoryTrace inspection
+Adds Stability Timeline Plot (v1.1)
 """
 
 import streamlit as st
@@ -16,6 +16,13 @@ from sandys_law_a7do.bootstrap import (
 
 
 def render_dashboard(state, snapshot):
+    # ==================================================
+    # SESSION STORAGE FOR TIMELINE (UI-ONLY)
+    # ==================================================
+
+    if "timeline" not in st.session_state:
+        st.session_state.timeline = []
+
     # ==================================================
     # SIDEBAR CONTROLS
     # ==================================================
@@ -47,6 +54,24 @@ def render_dashboard(state, snapshot):
     # --------------------------------------------------
 
     data = snapshot()
+    metrics = data["metrics"]
+
+    # ==================================================
+    # RECORD TIMELINE POINT
+    # ==================================================
+
+    st.session_state.timeline.append(
+        {
+            "tick": data["ticks"],
+            "Z": metrics["Z"],
+            "Coherence": metrics["Coherence"],
+            "Stability": metrics["Stability"],
+        }
+    )
+
+    # Limit memory to last N ticks (UI only)
+    MAX_POINTS = 100
+    st.session_state.timeline = st.session_state.timeline[-MAX_POINTS:]
 
     # ==================================================
     # SYSTEM OVERVIEW
@@ -75,8 +100,6 @@ def render_dashboard(state, snapshot):
 
     st.subheader("Metrics")
 
-    metrics = data["metrics"]
-
     st.progress(float(metrics["Z"]))
     st.caption(f"Z (Fragmentation): {metrics['Z']:.3f}")
 
@@ -85,6 +108,26 @@ def render_dashboard(state, snapshot):
 
     st.progress(float(metrics["Stability"]))
     st.caption(f"Stability: {metrics['Stability']:.3f}")
+
+    # ==================================================
+    # STABILITY TIMELINE (NEW)
+    # ==================================================
+
+    st.subheader("Stability Timeline")
+
+    timeline = st.session_state.timeline
+
+    if len(timeline) > 1:
+        st.line_chart(
+            {
+                "Z": [p["Z"] for p in timeline],
+                "Coherence": [p["Coherence"] for p in timeline],
+                "Stability": [p["Stability"] for p in timeline],
+            }
+        )
+        st.caption("Z (fragmentation), Coherence, and Stability over ticks")
+    else:
+        st.info("Tick the system to build a timeline")
 
     # ==================================================
     # REGULATION (SAFE SERIALISATION)
@@ -110,7 +153,7 @@ def render_dashboard(state, snapshot):
     )
 
     # ==================================================
-    # RECENT MEMORY TRACES (NEW)
+    # RECENT MEMORY TRACES
     # ==================================================
 
     st.subheader("Recent Memory Traces")
@@ -121,9 +164,7 @@ def render_dashboard(state, snapshot):
     if not traces:
         st.info("No crystallised memory yet")
     else:
-        # Show last N traces
-        N = 5
-        recent = traces[-N:]
+        recent = traces[-5:]
 
         table = []
         for t in recent:
