@@ -1,13 +1,25 @@
 # sandys_law_a7do/streamlit_app.py
 """
-Streamlit entry point (launcher)
+Streamlit entry point for A7DO
 
-This file exists ONLY to launch the real dashboard located at:
-interfaces/dashboard/streamlit_app.py
+This file MUST import the package, not local files.
 """
 
-from interfaces.dashboard.streamlit_app import main
-from bootstrap import build_system
+import sys
+from pathlib import Path
+
+# --------------------------------------------------
+# Ensure project root is on PYTHONPATH
+# --------------------------------------------------
+ROOT = Path(__file__).resolve().parent
+if str(ROOT.parent) not in sys.path:
+    sys.path.insert(0, str(ROOT.parent))
+
+# --------------------------------------------------
+# Import via package (CRITICAL)
+# --------------------------------------------------
+from sandys_law_a7do.bootstrap import build_system
+from sandys_law_a7do.interfaces.dashboard.streamlit_app import main
 
 
 def run():
