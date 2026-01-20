@@ -36,8 +36,11 @@ def main(snapshot):
     # Get access to the shared state via snapshot closure
     state = snapshot.__closure__[0].cell_contents
 
-    if st.sidebar.button("▶ Open Demo Frame"):
-        inject_demo_frame(state)
+    if st.sidebar.button("▶ New Frame"):
+    # Enforce single-frame invariant
+    if state["frames"].active is not None:
+        close_frame(state)
+    inject_demo_frame(state)
 
     if st.sidebar.button("➕ Add Fragment"):
         add_fragment_by_kind(state, "demo")
