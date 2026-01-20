@@ -1,11 +1,12 @@
 # sandys_law_a7do/interfaces/dashboard/dashboard_ui.py
 """
 A7DO — Sandy’s Law Dashboard UI
-Adds crystallisation markers to stability timeline (v1.2)
+Stability timeline corrected (structural vs temporal signals)
 """
 
 import streamlit as st
 from dataclasses import asdict
+import pandas as pd
 
 from sandys_law_a7do.bootstrap import (
     inject_demo_frame,
@@ -17,7 +18,7 @@ from sandys_law_a7do.bootstrap import (
 
 def render_dashboard(state, snapshot):
     # ==================================================
-    # SESSION STATE (UI-ONLY)
+    # SESSION STATE (UI ONLY)
     # ==================================================
 
     if "timeline" not in st.session_state:
@@ -62,23 +63,31 @@ def render_dashboard(state, snapshot):
     metrics = data["metrics"]
 
     # ==================================================
-    # RECORD TIMELINE POINT
+    # RECORD TIMELINE POINT (ONCE PER TICK ONLY)
     # ==================================================
 
-    st.session_state.timeline.append(
-        {
-            "tick": data["ticks"],
-            "Z": metrics["Z"],
-            "Coherence": metrics["Coherence"],
-            "Stability": metrics["Stability"],
-        }
+    last_tick = (
+        st.session_state.timeline[-1]["tick"]
+        if st.session_state.timeline
+        else None
     )
 
+    if last_tick != data["ticks"]:
+        st.session_state.timeline.append(
+            {
+                "tick": data["ticks"],
+                "Z": metrics["Z"],
+                "Coherence": metrics["Coherence"],
+                "Stability": metrics["Stability"],
+            }
+        )
+
+    # Keep UI memory bounded
     st.session_state.timeline = st.session_state.timeline[-200:]
 
-    # --------------------------------------------------
+    # ==================================================
     # DETECT CRYSTALLISATION EVENT
-    # --------------------------------------------------
+    # ==================================================
 
     if data["memory_count"] > st.session_state.last_memory_count:
         st.session_state.crystallisation_ticks.append(data["ticks"])
@@ -113,25 +122,28 @@ def render_dashboard(state, snapshot):
     st.subheader("Metrics")
 
     st.progress(float(metrics["Z"]))
-    st.caption(f"Z (Fragmentation): {metrics['Z']:.3f}")
+    st.caption(f"Z (Fragmentation — structural): {metrics['Z']:.3f}")
 
     st.progress(float(metrics["Coherence"]))
     st.caption(f"Coherence: {metrics['Coherence']:.3f}")
 
     st.progress(float(metrics["Stability"]))
-    st.caption(f"Stability: {metrics['Stability']:.3f}")
+    st.caption(f"Stability (temporal): {metrics['Stability']:.3f}")
 
     # ==================================================
-    # STABILITY TIMELINE WITH CRYSTALLISATION MARKERS
+    # STABILITY TIMELINE (CORRECTED)
     # ==================================================
 
-    st.subheader("Stability Timeline (Crystallisation Highlighted)")
+    st.subheader("Stability Timeline")
+
+    st.caption(
+        "Z changes only when fragments change. "
+        "Ticks evaluate stability but do not alter structure."
+    )
 
     timeline = st.session_state.timeline
 
     if len(timeline) > 1:
-        import pandas as pd
-
         df = pd.DataFrame(timeline).set_index("tick")
 
         st.line_chart(df[["Z", "Coherence", "Stability"]])
@@ -141,8 +153,6 @@ def render_dashboard(state, snapshot):
                 f"Crystallisation occurred at ticks: "
                 f"{st.session_state.crystallisation_ticks}"
             )
-            st.success("Vertical markers correspond to memory crystallisation events")
-
     else:
         st.info("Tick the system to build a timeline")
 
