@@ -1,13 +1,11 @@
 # bootstrap.py
 """
 A7DO + Sandy's Law
-System Bootstrap
-
-This is the ONLY file allowed to wire subsystems together.
+System Bootstrap (Streamlit-safe)
 """
 
 # =========================================================
-# CORE IMPORTS
+# CORE IMPORTS ONLY (NO UI)
 # =========================================================
 
 from roles.system_manager import SystemManager
@@ -26,9 +24,6 @@ from mind.regulation import regulate
 
 from accounting.metrics import metric_bundle
 
-# UI entry (dashboard only; chat is lazy-loaded)
-from interfaces.dashboard.streamlit_app import main as dashboard_main
-
 
 # =========================================================
 # SYSTEM CONSTRUCTION
@@ -40,7 +35,6 @@ def build_system():
     Returns (system_manager, snapshot_provider)
     """
 
-    # --- Core state ---
     frames = FrameStore()
     memory = StructuralMemory()
 
@@ -49,38 +43,20 @@ def build_system():
 
     preferences = PreferenceEngine()
 
-    # --- Roles ---
     system = SystemManager()
     sled = SLEDInterface()
-
     system.register(sled)
 
-    # -----------------------------------------------------
-    # SNAPSHOT PROVIDER (READ-ONLY)
-    # -----------------------------------------------------
-
     def snapshot():
-        """
-        Provides a safe, read-only snapshot for interfaces.
-        """
-
         active_frames = frames.frames if hasattr(frames, "frames") else []
 
-        # --- Perception summary ---
         fragments = []
         for f in active_frames:
             for frag in getattr(f, "fragments", []):
-                fragments.append(
-                    {
-                        "action": getattr(frag, "kind", "unknown"),
-                    }
-                )
+                fragments.append({"action": getattr(frag, "kind", "unknown")})
 
         percept = summarize_perception(fragments)
 
-        # -------------------------------------------------
-        # FIXED: pressure → blocked_events proxy
-        # -------------------------------------------------
         hard_pressure = getattr(boundaries, "hard_pressure", 0.0)
         blocked_events = int(hard_pressure * 10)
 
@@ -96,7 +72,6 @@ def build_system():
             block_rate=coherence.block_rate,
         )
 
-        # --- Metrics ---
         metrics = metric_bundle(
             {
                 "Z": coherence.fragmentation,
@@ -117,35 +92,3 @@ def build_system():
         }
 
     return system, snapshot
-
-
-# =========================================================
-# ENTRY MODES
-# =========================================================
-
-def run_dashboard():
-    _, snapshot = build_system()
-    dashboard_main(snapshot)
-
-
-def run_chat_cli():
-    # Lazy import to avoid Streamlit loading chat
-    from interfaces.chat.chat_cli import run_chat
-
-    _, snapshot = build_system()
-    run_chat(snapshot)
-
-
-# =========================================================
-# MAIN
-# =========================================================
-
-if __name__ == "__main__":
-    import sys
-
-    mode = sys.argv[1] if len(sys.argv) > 1 else "dashboard"
-
-    if mode == "chat":
-        run_chat_cli()
-    else:
-        run_dashboard()
