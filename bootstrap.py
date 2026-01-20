@@ -26,9 +26,8 @@ from mind.regulation import regulate
 
 from accounting.metrics import metric_bundle
 
-# Optional / UI
+# UI entry (dashboard only; chat is lazy-loaded)
 from interfaces.dashboard.streamlit_app import main as dashboard_main
-from interfaces.chat.chat_cli import run_chat
 
 
 # =========================================================
@@ -64,6 +63,7 @@ def build_system():
         """
         Provides a safe, read-only snapshot for interfaces.
         """
+
         active_frames = frames.frames if hasattr(frames, "frames") else []
 
         # --- Perception summary ---
@@ -78,12 +78,16 @@ def build_system():
 
         percept = summarize_perception(fragments)
 
+        # -------------------------------------------------
+        # FIXED: pressure → blocked_events proxy
+        # -------------------------------------------------
+        hard_pressure = getattr(boundaries, "hard_pressure", 0.0)
+        blocked_events = int(hard_pressure * 10)
+
         coherence = compute_coherence(
             fragment_count=percept.fragment_count,
             unique_actions=percept.unique_actions,
-            blocked_events=len(boundaries.__dict__.get("hard_pressure", []))
-            if hasattr(boundaries, "__dict__")
-            else 0,
+            blocked_events=blocked_events,
         )
 
         regulation = regulate(
@@ -125,6 +129,9 @@ def run_dashboard():
 
 
 def run_chat_cli():
+    # Lazy import to avoid Streamlit loading chat
+    from interfaces.chat.chat_cli import run_chat
+
     _, snapshot = build_system()
     run_chat(snapshot)
 
