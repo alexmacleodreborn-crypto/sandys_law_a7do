@@ -1,13 +1,28 @@
 # sandys_law_a7do/streamlit_app.py
 """
 A7DO — Sandy’s Law
-Single Streamlit entry point
+Single Streamlit entry point (Streamlit-safe)
 """
+
+import sys
+from pathlib import Path
+
+# --------------------------------------------------
+# MAKE PACKAGE IMPORTABLE (CRITICAL FOR STREAMLIT)
+# --------------------------------------------------
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+# --------------------------------------------------
+# NOW SAFE TO IMPORT PACKAGE
+# --------------------------------------------------
 
 import streamlit as st
 
-from .bootstrap import build_system
-from .interfaces.dashboard.dashboard_ui import render_dashboard
+from sandys_law_a7do.bootstrap import build_system
+from sandys_law_a7do.interfaces.dashboard.dashboard_ui import render_dashboard
 
 
 # --------------------------------------------------
