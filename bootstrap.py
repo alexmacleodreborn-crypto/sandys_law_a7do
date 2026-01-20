@@ -2,8 +2,7 @@
 """
 Bootstrap — v1.1
 Structural Regulation Core (v1.0) + Gated Memory (v1.1)
-
-This file is authoritative.
+Authoritative, API-correct version
 """
 
 # =====================================================
@@ -18,13 +17,13 @@ from .mind.coherence import compute_coherence
 from .mind.regulation import regulate
 
 # =====================================================
-# MEMORY (v1.1)
+# MEMORY (v1.1 — REAL API)
 # =====================================================
 
 from .memory.trace import MemoryTrace
 from .memory.structural_memory import StructuralMemory
 from .memory.crystallizer import crystallize
-from .memory.decay import decay_memory
+from .memory.decay import decay_weight   # ✅ correct name
 
 
 # =====================================================
@@ -159,4 +158,4 @@ def tick_system(state: dict):
             crystallize(state["memory"])
     else:
         state["stable_ticks"] = 0
-        decay_memory(state["memory"])
+        decay_weight(state["memory"])   # ✅ correct decay call
