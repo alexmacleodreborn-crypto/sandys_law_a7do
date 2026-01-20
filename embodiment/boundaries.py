@@ -1,39 +1,35 @@
-from __future__ import annotations
+# sandys_law_a7do/embodiment/boundaries.py
+
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Literal
+
+
+BoundaryType = Literal["soft", "hard"]
 
 
 @dataclass(frozen=True)
-class Boundary:
+class BoundarySignal:
     """
-    A physical boundary of the body.
-
-    Used to detect contact with the world.
+    Emitted when an interaction approaches or crosses a boundary.
     """
-    region: str
-    min_xy: Tuple[int, int]
-    max_xy: Tuple[int, int]
-
-    def contains(self, x: int, y: int) -> bool:
-        return (
-            self.min_xy[0] <= x <= self.max_xy[0]
-            and self.min_xy[1] <= y <= self.max_xy[1]
-        )
+    boundary_type: BoundaryType
+    severity: float          # [0..1]
+    description: str
 
 
-class BoundaryMap:
+@dataclass
+class BoundaryState:
     """
-    Collection of all body boundaries.
+    Tracks boundary pressure.
     """
+    soft_pressure: float = 0.0
+    hard_pressure: float = 0.0
 
-    def __init__(self) -> None:
-        self._boundaries: list[Boundary] = []
+    def register(self, signal: BoundarySignal) -> None:
+        if signal.boundary_type == "soft":
+            self.soft_pressure = min(1.0, self.soft_pressure + signal.severity)
+        else:
+            self.hard_pressure = min(1.0, self.hard_pressure + signal.severity)
 
-    def add(self, boundary: Boundary) -> None:
-        self._boundaries.append(boundary)
-
-    def detect_contact(self, x: int, y: int) -> list[str]:
-        """
-        Returns body regions contacted at (x, y).
-        """
-        return [b.region for b in self._boundaries if b.contains(x, y)]
+    def reset_soft(self) -> None:
+        self.soft_pressure = 0.0
