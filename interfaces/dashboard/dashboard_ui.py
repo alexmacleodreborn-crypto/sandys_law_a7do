@@ -19,7 +19,7 @@ def render_dashboard(state, snapshot):
     metrics = data["metrics"]
 
     # ---------------------------------
-    # INIT HISTORY (ONCE)
+    # INIT HISTORY + FLAGS (ONCE)
     # ---------------------------------
     if "history" not in state:
         state["history"] = {
@@ -28,6 +28,9 @@ def render_dashboard(state, snapshot):
             "Coherence": [],
             "Stability": [],
         }
+
+    if "record_history" not in state:
+        state["record_history"] = False
 
     # ---------------------------------
     # HEADER
@@ -48,9 +51,11 @@ def render_dashboard(state, snapshot):
 
     if c3.button("⏹ Close Frame"):
         close_frame(state)
+        state["record_history"] = True   # ✅ event-based history
 
     if c4.button("⏭ Tick"):
-        step_tick(state, snapshot)   # ✅ ONLY place tick is called
+        step_tick(state, snapshot)       # ✅ ONLY place tick is called
+        state["record_history"] = True   # ✅ event-based history
 
     # ---------------------------------
     # SNAPSHOT AFTER CONTROLS
@@ -84,12 +89,14 @@ def render_dashboard(state, snapshot):
     m3.metric("Stability", round(metrics["Stability"], 3))
 
     # ---------------------------------
-    # RECORD HISTORY (PURE APPEND)
+    # RECORD HISTORY (EVENT-BASED ONLY)
     # ---------------------------------
-    state["history"]["ticks"].append(data["ticks"])
-    state["history"]["Z"].append(metrics["Z"])
-    state["history"]["Coherence"].append(metrics["Coherence"])
-    state["history"]["Stability"].append(metrics["Stability"])
+    if state.get("record_history"):
+        state["history"]["ticks"].append(data["ticks"])
+        state["history"]["Z"].append(metrics["Z"])
+        state["history"]["Coherence"].append(metrics["Coherence"])
+        state["history"]["Stability"].append(metrics["Stability"])
+        state["record_history"] = False
 
     # ---------------------------------
     # METRIC EVOLUTION PLOT
@@ -132,15 +139,15 @@ def render_dashboard(state, snapshot):
     memory = state.get("memory")
 
     if memory and hasattr(memory, "traces") and memory.traces:
-        recent = memory.traces[-10:]  # last 10 traces only
+        recent = memory.traces[-10:]  # last 10 traces
 
         st.table([
             {
                 "tick": t.tick,
-                "Z": round(t.features.get("Z", 0.0), 3),
-                "coherence": round(t.features.get("coherence", 0.0), 3),
-                "stability": round(t.features.get("stability", 0.0), 3),
-                "frame": t.features.get("frame_signature", "none"),
+                "Z": round(t.Z, 3),
+                "coherence": round(t.coherence, 3),
+                "stability": round(t.stability, 3),
+                "frame": t.frame_signature,
                 "tags": ", ".join(t.tags),
             }
             for t in recent
