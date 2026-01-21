@@ -137,7 +137,7 @@ def close_frame(state: dict):
 
 
 # =====================================================
-# TICK + MEMORY
+# TICK + MEMORY GATING (LOCKED)
 # =====================================================
 
 def tick_system(state: dict):
@@ -150,26 +150,29 @@ def tick_system(state: dict):
     coherence = metrics["Coherence"]
     stability = metrics["Stability"]
 
-    # record metric history
-    hist = state["metric_history"]
-    hist["ticks"].append(state["ticks"])
-    hist["Z"].append(Z)
-    hist["Coherence"].append(coherence)
-    hist["Stability"].append(stability)
-
     allowed = (
         Z < Z_MAX
         and coherence >= COHERENCE_MIN
         and stability >= STABILITY_MIN
     )
 
+    # --------------------------------------------------
+    # MEMORY TRACE (STRUCTURALLY CORRECT)
+    # --------------------------------------------------
     trace = MemoryTrace(
         trace_id=state["ticks"],
         features={
             "Z": Z,
             "coherence": coherence,
             "stability": stability,
+            "frame": (
+                snap["active_frame"].label
+                if snap["active_frame"]
+                else "none"
+            ),
         },
+        weight=1.0,
+        tags=["stable"] if allowed else ["unstable"],
     )
 
     if allowed:
@@ -178,7 +181,6 @@ def tick_system(state: dict):
 
         if state["stable_ticks"] >= MEMORY_PERSIST_TICKS:
             crystallize(state["memory"])
-            state["crystallisation_ticks"].append(state["ticks"])
     else:
         state["stable_ticks"] = 0
         decay_weight(state["memory"])
