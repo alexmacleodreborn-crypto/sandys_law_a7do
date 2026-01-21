@@ -121,4 +121,5 @@ def render_dashboard(state, snapshot):
         state["history"]["ticks"],
         state["history"]["Stability"],
         label="Stability",
+        )
        
