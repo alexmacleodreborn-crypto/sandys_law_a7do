@@ -1,5 +1,3 @@
-# sandys_law_a7do/interfaces/dashboard/dashboard_ui.py
-
 import streamlit as st
 import matplotlib.pyplot as plt
 
@@ -12,9 +10,15 @@ from sandys_law_a7do.engine.tick_engine import step_tick
 
 
 def render_dashboard(state, snapshot):
+    # ---------------------------------
+    # INITIAL SNAPSHOT
+    # ---------------------------------
     data = snapshot()
     metrics = data["metrics"]
 
+    # ---------------------------------
+    # INIT HISTORY + FLAGS (ONCE)
+    # ---------------------------------
     if "history" not in state:
         state["history"] = {
             "ticks": [],
@@ -22,6 +26,11 @@ def render_dashboard(state, snapshot):
             "Coherence": [],
             "Stability": [],
         }
+
+    if "record_history" not in state:
+        state["record_history"] = False
+
+    if "last_recorded_tick" not in state:
         state["last_recorded_tick"] = None
 
     # ---------------------------------
@@ -30,25 +39,29 @@ def render_dashboard(state, snapshot):
     st.title("A7DO — Sandy’s Law System Dashboard")
 
     # ---------------------------------
-    # CONTROLS
+    # CONTROLS (STATE MUTATION ONLY HERE)
     # ---------------------------------
     st.subheader("Controls")
     c1, c2, c3, c4 = st.columns(4)
 
     if c1.button("🆕 New Frame"):
         open_frame(state)
+        state["record_history"] = True
 
     if c2.button("➕ Add Fragment"):
         add_fragment(state)
+        state["record_history"] = True
 
     if c3.button("⏹ Close Frame"):
         close_frame(state)
+        state["record_history"] = True
 
     if c4.button("⏭ Tick"):
         step_tick(state, snapshot)
+        state["record_history"] = True
 
     # ---------------------------------
-    # SNAPSHOT
+    # SNAPSHOT AFTER CONTROLS
     # ---------------------------------
     data = snapshot()
     metrics = data["metrics"]
@@ -73,63 +86,104 @@ def render_dashboard(state, snapshot):
     # METRICS
     # ---------------------------------
     st.subheader("Metrics")
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Z", round(metrics["Z"], 3))
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Z (Fragmentation)", round(metrics["Z"], 3))
     m2.metric("Coherence", round(metrics["Coherence"], 3))
     m3.metric("Stability", round(metrics["Stability"], 3))
-    m4.metric("Load", round(metrics["Load"], 3))
 
     # ---------------------------------
-    # RECORD HISTORY
+    # RECORD HISTORY (FRAME-AWARE + SAFE)
     # ---------------------------------
-    if state["last_recorded_tick"] != data["ticks"]:
+    should_record = (
+        data["active_frame"] is not None
+        or state["record_history"]
+    )
+
+    if should_record and state["last_recorded_tick"] != data["ticks"]:
         state["history"]["ticks"].append(data["ticks"])
         state["history"]["Z"].append(metrics["Z"])
         state["history"]["Coherence"].append(metrics["Coherence"])
         state["history"]["Stability"].append(metrics["Stability"])
+
         state["last_recorded_tick"] = data["ticks"]
+        state["record_history"] = False
 
     # ---------------------------------
-    # METRIC EVOLUTION
+    # METRIC EVOLUTION PLOT
     # ---------------------------------
     st.subheader("Metric Evolution")
+
     fig, ax = plt.subplots(figsize=(9, 4))
 
-    ax.plot(state["history"]["ticks"], state["history"]["Z"], label="Z")
-    ax.plot(state["history"]["ticks"], state["history"]["Coherence"], label="Coherence")
-    ax.plot(state["history"]["ticks"], state["history"]["Stability"], label="Stability")
+    ax.plot(
+        state["history"]["ticks"],
+        state["history"]["Z"],
+        label="Z (Fragmentation)",
+        color="red",
+    )
+    ax.plot(
+        state["history"]["ticks"],
+        state["history"]["Coherence"],
+        label="Coherence",
+        color="blue",
+    )
+    ax.plot(
+        state["history"]["ticks"],
+        state["history"]["Stability"],
+        label="Stability",
+        color="green",
+    )
 
-    ax.set_ylim(0.0, 1.05)
     ax.set_xlabel("Tick")
+    ax.set_ylabel("Value")
+    ax.set_ylim(0.0, 1.05)
     ax.legend()
     ax.grid(True)
 
     st.pyplot(fig)
 
     # ---------------------------------
-    # GATES (READ ONLY)
+    # MEMORY TIMELINE (READ-ONLY)
     # ---------------------------------
-    st.subheader("Gate Status (Read-Only)")
+    st.subheader("Memory Timeline (Recent)")
 
-    gates = data.get("gates", {})
-    if gates:
+    memory = state.get("memory")
+
+    if memory and hasattr(memory, "traces") and memory.traces:
+        recent = memory.traces[-10:]
+
         st.table([
             {
-                "gate": name,
-                "score": round(info["score"], 3),
-                "open": info["open"],
-                "reason": info["reason"],
+                "tick": t.tick,
+                "Z": round(t.Z, 3),
+                "coherence": round(t.coherence, 3),
+                "stability": round(t.stability, 3),
+                "frame": t.frame_signature,
+                "tags": ", ".join(t.tags),
             }
-            for name, info in gates.items()
+            for t in recent
         ])
+    else:
+        st.caption("No memory traces recorded yet.")
+
+    # ---------------------------------
+    # GATES (READ-ONLY — Phase 7.3)
+    # ---------------------------------
+    st.subheader("Gate Scores")
+
+    gates = data.get("gates")
+
+    if gates and hasattr(gates, "scores"):
+        for name, score in gates.scores.items():
+            st.metric(
+                label=name,
+                value=round(score, 3),
+            )
     else:
         st.caption("No gate data available.")
 
     # ---------------------------------
-    # PREFERENCES (READ ONLY)
+    # FINAL STATE
     # ---------------------------------
-    st.subheader("Preference Bias (Top Contexts)")
-    if data.get("preference_top"):
-        st.table(data["preference_top"])
-    else:
-        st.caption("No preference data yet.")
+    st.subheader("Final State")
+    st.json(data)
