@@ -1,12 +1,13 @@
+# sandys_law_a7do/integration/perception_loop.py
 """
-Perception Loop — Phase 6.1 (IMMUTABLE SAFE)
+Perception Loop — Phase 6.2 (IMMUTABLE SAFE)
 
 Responsibilities:
-- Generate perceptual fragments
-- Carry READ-ONLY attention as structural payload
-- NO mutation of Fragment instances
-- NO action selection
+- Generate perceptual fragments continuously
+- Embed READ-ONLY attention as payload (no mutation of Fragment)
 - NO memory writes
+- NO action selection
+- NEVER throw (perception must not crash the app)
 """
 
 from typing import List
@@ -15,72 +16,44 @@ from sandys_law_a7do.frames.fragment import Fragment
 from sandys_law_a7do.accounting.attention import compute_attention_gain
 
 
-# --------------------------------------------------
-# CONSTANTS (SAFE, SMALL)
-# --------------------------------------------------
-
-BASE_ATTENTION: float = 1.0
-
-
-# --------------------------------------------------
-# MAIN PERCEPTION LOOP
-# --------------------------------------------------
-
 def perceive_and_act(state: dict) -> List[Fragment]:
-    """
-    Phase 4–6 perception loop.
-
-    Generates fragments and embeds attention
-    as STRUCTURAL PAYLOAD (immutable-safe).
-    """
-
     fragments: List[Fragment] = []
 
-    # --------------------------------------------------
-    # BASE PERCEPTION (DEMO / PLACEHOLDER)
-    # --------------------------------------------------
-
-    base_payload = {"source": "demo"}
-
-    # --------------------------------------------------
-    # PHASE 6.1 — ATTENTION (READ-ONLY BIAS)
-    # --------------------------------------------------
-
-    attention_gain: float = BASE_ATTENTION
+    base_attention = 1.0
+    attention_gain = base_attention
 
     pref_store = state.get("preference_store")
     pref_engine = state.get("preference_engine")
 
     if pref_store and pref_engine:
         try:
-            # Use LAST preference context only
-            last_update = state.get("last_preference_update")
+            coherence = float(state.get("last_coherence", 0.0))
+            fragmentation = float(state.get("last_fragmentation", 0.0))
+            block_rate = float(state.get("last_block_rate", 0.0))
+            notes = state.get("last_percept_notes", [])
 
-            if last_update:
-                context_key = last_update.get("context")
-                if context_key:
-                    pref_score = float(pref_store.get(context_key))
+            context_key = pref_engine.context_key_from_accounting(
+                coherence=coherence,
+                fragmentation=fragmentation,
+                block_rate=block_rate,
+                notes=notes,
+            )
 
-                    attention_gain = compute_attention_gain(
-                        preference_score=pref_score
-                    )
+            pref_score = float(pref_store.get(context_key))
 
+            attention_gain = float(
+                compute_attention_gain(preference_score=pref_score)
+            )
         except Exception:
-            # Perception must NEVER fail
-            attention_gain = BASE_ATTENTION
-
-    # --------------------------------------------------
-    # CREATE FRAGMENT (IMMUTABLE)
-    # --------------------------------------------------
+            attention_gain = base_attention
 
     frag = Fragment(
         kind="contact",
         payload={
-            **base_payload,
-            "attention": float(attention_gain),  # STRUCTURAL, READ-ONLY
+            "source": "demo",
+            "attention": float(attention_gain),
         },
     )
 
     fragments.append(frag)
-
     return fragments
