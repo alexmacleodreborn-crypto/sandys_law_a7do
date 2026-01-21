@@ -4,7 +4,9 @@ from sandys_law_a7do.memory.trace import MemoryTrace
 from sandys_law_a7do.memory.crystallizer import crystallize
 from sandys_law_a7do.memory.decay import decay_weight
 
-# Frozen thresholds
+# -----------------------------
+# Frozen regulation thresholds
+# -----------------------------
 Z_MAX = 0.6
 COHERENCE_MIN = 0.7
 STABILITY_MIN = 0.7
@@ -14,9 +16,7 @@ MEMORY_PERSIST_TICKS = 3
 def step_tick(state: dict, snapshot_fn):
     """
     Single authoritative tick step.
-    Pure engine logic.
-    No Streamlit.
-    No UI.
+    No Streamlit, no UI, no side-effects outside state.
     """
 
     state["ticks"] += 1
