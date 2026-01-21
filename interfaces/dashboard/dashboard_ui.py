@@ -1,24 +1,14 @@
 # sandys_law_a7do/interfaces/dashboard/dashboard_ui.py
-"""
-A7DO — Sandy’s Law Dashboard UI
-Render-only module (Option A: relative imports)
-"""
 
 import streamlit as st
 import matplotlib.pyplot as plt
 
-# RELATIVE IMPORTS (CRITICAL)
 from ...bootstrap import (
     inject_demo_frame,
     add_fragment_by_kind,
     close_frame,
     tick_system,
 )
-
-
-# =====================================================
-# DASHBOARD RENDER
-# =====================================================
 
 def render_dashboard(state, snapshot):
     data = snapshot()
@@ -43,7 +33,7 @@ def render_dashboard(state, snapshot):
     )
 
     # -------------------------------------------------
-    # METRICS
+    # METRICS (CURRENT)
     # -------------------------------------------------
     st.subheader("Metrics")
     c1, c2, c3 = st.columns(3)
@@ -70,60 +60,38 @@ def render_dashboard(state, snapshot):
         tick_system(state)
 
     # -------------------------------------------------
-    # METRIC HISTORY (PRESERVE EXISTING BEHAVIOUR)
-    # -------------------------------------------------
-    if "history" not in state:
-        state["history"] = {
-            "ticks": [],
-            "Z": [],
-            "Coherence": [],
-            "Stability": [],
-        }
-
-    state["history"]["ticks"].append(data["ticks"])
-    state["history"]["Z"].append(metrics["Z"])
-    state["history"]["Coherence"].append(metrics["Coherence"])
-    state["history"]["Stability"].append(metrics["Stability"])
-
-    # -------------------------------------------------
-    # METRIC EVOLUTION + CRYSTALLISATION OVERLAY
+    # METRIC EVOLUTION (TRUE PROGRESSION)
     # -------------------------------------------------
     st.subheader("Metric Evolution")
 
-    fig, ax = plt.subplots(figsize=(9, 4))
+    hist = state["metric_history"]
 
-    ax.plot(
-        state["history"]["ticks"],
-        state["history"]["Z"],
-        label="Z (Fragmentation)",
-    )
-    ax.plot(
-        state["history"]["ticks"],
-        state["history"]["Coherence"],
-        label="Coherence",
-    )
-    ax.plot(
-        state["history"]["ticks"],
-        state["history"]["Stability"],
-        label="Stability",
-    )
+    if len(hist["ticks"]) > 1:
+        fig, ax = plt.subplots(figsize=(9, 4))
 
-    # Crystallisation markers (event-based)
-    for i, t in enumerate(state.get("crystallisation_ticks", [])):
-        ax.axvline(
-            x=t,
-            linestyle="--",
-            linewidth=1.5,
-            alpha=0.7,
-            label="Crystallisation" if i == 0 else None,
-        )
+        ax.plot(hist["ticks"], hist["Z"], label="Z (Fragmentation)")
+        ax.plot(hist["ticks"], hist["Coherence"], label="Coherence")
+        ax.plot(hist["ticks"], hist["Stability"], label="Stability")
 
-    ax.set_xlabel("Tick")
-    ax.set_ylabel("Value")
-    ax.legend()
-    ax.grid(True)
+        # Crystallisation overlays
+        for i, t in enumerate(state.get("crystallisation_ticks", [])):
+            ax.axvline(
+                x=t,
+                linestyle="--",
+                linewidth=1.5,
+                alpha=0.7,
+                label="Crystallisation" if i == 0 else None,
+            )
 
-    st.pyplot(fig)
+        ax.set_xlabel("Tick")
+        ax.set_ylabel("Value")
+        ax.set_ylim(0, 1)
+        ax.legend()
+        ax.grid(True)
+
+        st.pyplot(fig)
+    else:
+        st.info("Run a few ticks to see metric evolution.")
 
     # -------------------------------------------------
     # FINAL STATE
