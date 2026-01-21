@@ -67,7 +67,7 @@ def perceive_and_act(state: dict) -> List[Fragment]:
 
         except Exception:
             # Perception must NEVER fail
-            attention_gain = 1.0
+            attention_gain = base_attention * preference_bias
 
     # --------------------------------------------------
     # CREATE FRAGMENT (IMMUTABLE)
