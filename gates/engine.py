@@ -1,51 +1,71 @@
 # sandys_law_a7do/gates/engine.py
 """
-Gate Engine — Phase 7.2 (STRUCTURAL, READ-ONLY)
+Gate Engine — Phase 7.3 (READ-ONLY)
+
+Evaluates cognitive gates without enforcing them.
+No mutation. No routing. No blocking.
 """
 
-from typing import Dict
+from dataclasses import dataclass
+from typing import Dict, List
 
-from sandys_law_a7do.gates.base_gate import GateDecision
-from sandys_law_a7do.gates.gate_state import GateState
-
+from sandys_law_a7do.gates.base_gate import BaseGate
 from sandys_law_a7do.gates.perception_gate import PerceptionGate
 from sandys_law_a7do.gates.consolidation_gate import ConsolidationGate
 from sandys_law_a7do.gates.education_gate import EducationGate
 from sandys_law_a7do.gates.role_gate import RoleGate
 
 
+# --------------------------------------------------
+# DATA STRUCTURES
+# --------------------------------------------------
+
+@dataclass(frozen=True)
+class GateState:
+    name: str
+    score: float
+    open: bool
+    reason: str
+
+
+@dataclass(frozen=True)
+class GateSnapshot:
+    states: Dict[str, GateState]
+
+
+# --------------------------------------------------
+# ENGINE
+# --------------------------------------------------
+
 class GateEngine:
     """
-    Structural gate evaluation engine.
+    Evaluates all gates using current system state.
+
+    READ-ONLY:
+    - Does not block
+    - Does not mutate
+    - Does not route
     """
 
     def __init__(self) -> None:
-        self.perception_gate = PerceptionGate()
-        self.consolidation_gate = ConsolidationGate()
-        self.education_gate = EducationGate()
-        self.role_gate = RoleGate()
+        self.gates: List[BaseGate] = [
+            PerceptionGate(),
+            ConsolidationGate(),
+            EducationGate(),
+            RoleGate(),
+        ]
 
-    def evaluate(self, *, state: dict) -> GateState:
-        decisions: Dict[str, GateDecision] = {}
+    def evaluate(self, state: dict) -> GateSnapshot:
+        states: Dict[str, GateState] = {}
 
-        decisions["perception"] = self.perception_gate.evaluate(
-            block_rate=float(state.get("last_block_rate", 0.0)),
-            fragmentation=float(state.get("last_fragmentation", 0.0)),
-        )
+        for gate in self.gates:
+            result = gate.evaluate(state)
 
-        decisions["consolidation"] = self.consolidation_gate.evaluate(
-            coherence=float(state.get("last_coherence", 0.0)),
-            fragmentation=float(state.get("last_fragmentation", 0.0)),
-        )
+            states[gate.name] = GateState(
+                name=gate.name,
+                score=float(result.score),
+                open=bool(result.open),
+                reason=str(result.reason),
+            )
 
-        decisions["education"] = self.education_gate.evaluate(
-            readiness=float(state.get("readiness", 0.5)),
-            passed_exam=bool(state.get("passed_exam", False)),
-        )
-
-        decisions["role"] = self.role_gate.evaluate(
-            role_name=state.get("role_name", "observer"),
-            allowed_roles=state.get("allowed_roles", ["observer"]),
-        )
-
-        return GateState(decisions=decisions)
+        return GateSnapshot(states=states)
