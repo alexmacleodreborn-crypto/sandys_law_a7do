@@ -1,7 +1,12 @@
 # sandys_law_a7do/bootstrap.py
 """
-A7DO Bootstrap — FINAL STABLE CORE
+Bootstrap — v1.2
+Option A: Episode commit on frame close (FROZEN)
 """
+
+# =====================================================
+# CORE
+# =====================================================
 
 from sandys_law_a7do.frames.store import FrameStore
 from sandys_law_a7do.frames.frame import Frame
@@ -10,12 +15,13 @@ from sandys_law_a7do.frames.fragment import Fragment
 from sandys_law_a7do.mind.coherence import compute_coherence
 from sandys_law_a7do.mind.regulation import regulate
 
+from sandys_law_a7do.memory.trace import MemoryTrace
 from sandys_law_a7do.memory.structural_memory import StructuralMemory
 
 
-# --------------------------------------------------
+# =====================================================
 # SYSTEM BUILD
-# --------------------------------------------------
+# =====================================================
 
 def build_system():
     frames = FrameStore()
@@ -25,7 +31,6 @@ def build_system():
         "frames": frames,
         "memory": memory,
         "ticks": 0,
-        "stable_ticks": 0,
     }
 
     def snapshot():
@@ -34,9 +39,9 @@ def build_system():
     return snapshot, state
 
 
-# --------------------------------------------------
-# SNAPSHOT (PURE)
-# --------------------------------------------------
+# =====================================================
+# SNAPSHOT (READ-ONLY)
+# =====================================================
 
 def system_snapshot(state: dict) -> dict:
     frames: FrameStore = state["frames"]
@@ -80,21 +85,72 @@ def system_snapshot(state: dict) -> dict:
     }
 
 
-# --------------------------------------------------
+# =====================================================
 # FRAME ACTIONS
-# --------------------------------------------------
+# =====================================================
 
 def open_frame(state: dict):
     if state["frames"].active:
         return
-    state["frames"].open(Frame(domain="demo", label="ui"))
+    frame = Frame(domain="demo", label="ui")
+    state["frames"].open(frame)
 
 
-def add_fragment(state: dict, kind="demo"):
+def add_fragment(state: dict):
     if not state["frames"].active:
         return
-    state["frames"].add_fragment(Fragment(kind=kind))
+    frag = Fragment(kind="demo")
+    state["frames"].add_fragment(frag)
 
 
 def close_frame(state: dict):
-    state["frames"].close()
+    """
+    OPTION A — EPISODE COMMIT POINT (ONLY CHANGE)
+    """
+    frames: FrameStore = state["frames"]
+    memory: StructuralMemory = state["memory"]
+
+    frame = frames.active
+    if not frame:
+        return
+
+    # --- final snapshot BEFORE closing ---
+    fragment_count = len(frame.fragments)
+    unique_actions = len(set(f.kind for f in frame.fragments))
+
+    report = compute_coherence(
+        fragment_count=fragment_count,
+        unique_actions=unique_actions,
+        blocked_events=0,
+    )
+
+    Z = float(report.fragmentation)
+    coherence = float(report.coherence)
+    stability = coherence * (1.0 - float(report.block_rate))
+
+    # --- commit EPISODE memory ---
+    trace = MemoryTrace(
+        state["ticks"],                 # trace_id
+        {                               # features
+            "Z": Z,
+            "coherence": coherence,
+            "stability": stability,
+            "fragments": fragment_count,
+            "unique_kinds": unique_actions,
+        },
+        frame_signature=f"{frame.domain}:{frame.label}",
+        tags=["episode", "stable"] if coherence >= 0.7 else ["episode", "unstable"],
+    )
+
+    memory.add_trace(trace)
+
+    # --- now close frame (RESET is correct) ---
+    frames.close()
+
+
+# =====================================================
+# TICK (UNCHANGED)
+# =====================================================
+
+def tick_system(state: dict):
+    state["ticks"] += 1
