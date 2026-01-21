@@ -1,76 +1,94 @@
 # sandys_law_a7do/integration/perception_loop.py
 """
-Phase 4.1 — Controlled Perceptual Diversity
+Perception Loop — Phase 6.1
 
-Purpose:
-- Introduce controlled structural diversity
-- Allow Z to move without destabilising the system
-- Preserve Sandy’s Law constraints
+Responsibilities:
+- Generate perceptual fragments
+- Annotate fragments with READ-ONLY attention bias
+- NO action selection
+- NO filtering
+- NO memory writes
+- NO learning
 
-Important:
-- This module must NOT depend on where PreferenceEngine lives.
-- It reads bias from state only (if present).
+Attention is a soft scalar only.
 """
 
-from __future__ import annotations
-
-import random
 from typing import List
 
 from sandys_law_a7do.frames.fragment import Fragment
+from sandys_law_a7do.accounting.attention import compute_attention_gain
 
 
-def perceive_and_act(state) -> List[Fragment]:
+# --------------------------------------------------
+# MAIN PERCEPTION LOOP
+# --------------------------------------------------
+
+def perceive_and_act(state: dict) -> List[Fragment]:
     """
-    Minimal embodied perception loop.
+    Phase 4–6 perception loop.
 
-    Produces small structural variation only.
-    No semantics, no reward, no goals.
+    Generates fragments and annotates them with
+    preference-weighted attention (Phase 6.1).
 
-    Optional: if a preference engine exists in state, it may bias
-    novelty probability very gently. No action selection.
+    This function MUST remain:
+    - deterministic
+    - side-effect free (except fragment creation)
     """
 
     fragments: List[Fragment] = []
 
     # --------------------------------------------------
-    # Base environmental load (always present)
+    # BASIC PERCEPTION (EXAMPLE / DEMO)
     # --------------------------------------------------
-    load_level = random.choice(["low", "medium"])
-    fragments.append(Fragment(kind=f"load:{load_level}"))
+    # NOTE: This is intentionally simple.
+    # Replace / expand later with sensors, walkers, etc.
+
+    frag = Fragment(
+        kind="contact",
+        payload={"source": "demo"},
+    )
+    fragments.append(frag)
 
     # --------------------------------------------------
-    # Preference-aware bias (READ-ONLY)
+    # PHASE 6.1 — READ-ONLY ATTENTION
     # --------------------------------------------------
-    # We don't import PreferenceEngine here; we only read from state.
-    pref_engine = state.get("preference_engine", None)
-    context_key = state.get("current_context_key", "none")
 
-    # Default neutral bias
-    bias = 0.0
+    attention_gain = 1.0  # default neutral
 
-    # If your PreferenceEngine has a store with prefs dict, use it safely.
-    # (Works for both mind.preference and accounting.preference as long as
-    # they expose .store.prefs)
-    if pref_engine is not None:
+    pref_store = state.get("preference_store")
+    pref_engine = state.get("preference_engine")
+
+    if pref_store and pref_engine:
         try:
-            bias = float(getattr(getattr(pref_engine, "store", None), "prefs", {}).get(context_key, 0.0))
+            # Use LAST KNOWN structural metrics if available
+            coherence = float(state.get("last_coherence", 0.0))
+            fragmentation = float(state.get("last_fragmentation", 0.0))
+            block_rate = float(state.get("last_block_rate", 0.0))
+            notes = state.get("last_percept_notes", [])
+
+            context_key = pref_engine.context_key_from_accounting(
+                coherence=coherence,
+                fragmentation=fragmentation,
+                block_rate=block_rate,
+                notes=notes,
+            )
+
+            pref_score = pref_store.get(context_key)
+
+            attention_gain = compute_attention_gain(
+                preference_score=pref_score
+            )
+
         except Exception:
-            bias = 0.0
-
-    # Map bias ∈ [-1, +1] → novelty probability adjustment ∈ [-0.08, +0.08]
-    novelty_p = 0.30 + max(-0.08, min(0.08, 0.08 * bias))
+            # HARD FAIL SAFE — perception must never break
+            attention_gain = 1.0
 
     # --------------------------------------------------
-    # Occasional novelty
+    # ANNOTATE FRAGMENTS (NO FILTERING)
     # --------------------------------------------------
-    if random.random() < novelty_p:
-        fragments.append(Fragment(kind="novel"))
 
-    # --------------------------------------------------
-    # Rare pressure spike (small chance)
-    # --------------------------------------------------
-    if random.random() < 0.10:
-        fragments.append(Fragment(kind="pressure"))
+    for f in fragments:
+        # Dynamic attribute is intentional (Phase 6.1)
+        f.attention = attention_gain
 
     return fragments
