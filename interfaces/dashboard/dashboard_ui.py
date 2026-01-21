@@ -12,6 +12,9 @@ from sandys_law_a7do.engine.tick_engine import step_tick
 
 
 def render_dashboard(state, snapshot):
+    # ---------------------------------
+    # INITIAL SNAPSHOT
+    # ---------------------------------
     data = snapshot()
     metrics = data["metrics"]
 
@@ -24,8 +27,9 @@ def render_dashboard(state, snapshot):
             "Z": [],
             "Coherence": [],
             "Stability": [],
-            "Attention": [],
             "Load": [],
+            "Attention": [],
+            "PredErr": [],
         }
 
     if "record_history" not in state:
@@ -34,10 +38,13 @@ def render_dashboard(state, snapshot):
     if "last_recorded_tick" not in state:
         state["last_recorded_tick"] = None
 
+    # ---------------------------------
+    # HEADER
+    # ---------------------------------
     st.title("A7DO — Sandy’s Law System Dashboard")
 
     # ---------------------------------
-    # CONTROLS
+    # CONTROLS (STATE MUTATION ONLY HERE)
     # ---------------------------------
     st.subheader("Controls")
     c1, c2, c3, c4 = st.columns(4)
@@ -52,10 +59,10 @@ def render_dashboard(state, snapshot):
 
     if c3.button("⏹ Close Frame"):
         close_frame(state)
-        state["record_history"] = True
+        state["record_history"] = True   # episode boundary
 
     if c4.button("⏭ Tick"):
-        step_tick(state, snapshot)
+        step_tick(state, snapshot)       # ONLY place tick is called
         state["record_history"] = True
 
     # ---------------------------------
@@ -84,24 +91,26 @@ def render_dashboard(state, snapshot):
     # METRICS
     # ---------------------------------
     st.subheader("Metrics")
-    m1, m2, m3, m4, m5, m6 = st.columns(6)
-    m1.metric("Z", round(metrics.get("Z", 0.0), 3))
-    m2.metric("Coherence", round(metrics.get("Coherence", 0.0), 3))
-    m3.metric("Stability", round(metrics.get("Stability", 0.0), 3))
-    m4.metric("Load", round(metrics.get("Load", 0.0), 3))
-    m5.metric("Attention", round(metrics.get("Attention", 0.0), 3))
-    m6.metric("PredErr", round(float(state.get("prediction_error", 0.0)), 3))
+    m1, m2, m3, m4, m5 = st.columns(5)
+    m1.metric("Z (Fragmentation)", round(metrics["Z"], 3))
+    m2.metric("Coherence", round(metrics["Coherence"], 3))
+    m3.metric("Stability", round(metrics["Stability"], 3))
+    m4.metric("PredErr", round(metrics.get("PredErr", 0.0), 3))
+    m5.metric("Attention", round(metrics.get("AttentionLast", 1.0), 3))
 
     # ---------------------------------
-    # RECORD HISTORY (SAFE)
+    # RECORD HISTORY (FRAME-AWARE + SAFE)
     # ---------------------------------
-    if state["record_history"] and state["last_recorded_tick"] != data["ticks"]:
+    should_record = (data["active_frame"] is not None) or state["record_history"]
+
+    if should_record and state["last_recorded_tick"] != data["ticks"]:
         state["history"]["ticks"].append(data["ticks"])
-        state["history"]["Z"].append(metrics.get("Z", 0.0))
-        state["history"]["Coherence"].append(metrics.get("Coherence", 0.0))
-        state["history"]["Stability"].append(metrics.get("Stability", 0.0))
+        state["history"]["Z"].append(metrics["Z"])
+        state["history"]["Coherence"].append(metrics["Coherence"])
+        state["history"]["Stability"].append(metrics["Stability"])
         state["history"]["Load"].append(metrics.get("Load", 0.0))
-        state["history"]["Attention"].append(metrics.get("Attention", 0.0))
+        state["history"]["Attention"].append(metrics.get("AttentionLast", 1.0))
+        state["history"]["PredErr"].append(metrics.get("PredErr", 0.0))
 
         state["last_recorded_tick"] = data["ticks"]
         state["record_history"] = False
@@ -112,56 +121,60 @@ def render_dashboard(state, snapshot):
     st.subheader("Metric Evolution")
 
     fig, ax = plt.subplots(figsize=(9, 4))
-    ax.plot(state["history"]["ticks"], state["history"]["Z"], label="Z", color="red")
-    ax.plot(state["history"]["ticks"], state["history"]["Coherence"], label="Coherence", color="blue")
-    ax.plot(state["history"]["ticks"], state["history"]["Stability"], label="Stability", color="green")
-    ax.plot(state["history"]["ticks"], state["history"]["Load"], label="Load", color="orange", linestyle=":")
-    ax.plot(state["history"]["ticks"], state["history"]["Attention"], label="Attention", color="purple", linestyle="--")
 
-    ax.set_ylim(0.0, 1.05)
+    ax.plot(state["history"]["ticks"], state["history"]["Z"], label="Z")
+    ax.plot(state["history"]["ticks"], state["history"]["Coherence"], label="Coherence")
+    ax.plot(state["history"]["ticks"], state["history"]["Stability"], label="Stability")
+    ax.plot(state["history"]["ticks"], state["history"]["Load"], label="Load", linestyle=":")
+    ax.plot(state["history"]["ticks"], state["history"]["Attention"], label="Attention", linestyle="--")
+    ax.plot(state["history"]["ticks"], state["history"]["PredErr"], label="PredErr", linestyle="--")
+
     ax.set_xlabel("Tick")
     ax.set_ylabel("Value")
+    ax.set_ylim(0.0, 1.55)
     ax.legend()
     ax.grid(True)
+
     st.pyplot(fig)
 
     # ---------------------------------
-    # PREFERENCE STATUS (READ-ONLY)
+    # PREFERENCE (READ-ONLY)
     # ---------------------------------
     st.subheader("Preference (Read-only Bias)")
-
-    last_up = state.get("last_preference_update")
-    if last_up:
-        st.json(last_up)
-    else:
-        st.caption("No preference update yet (tick to generate one).")
-
-    pref_top = data.get("preference_top", [])
-    if pref_top:
-        st.table(pref_top)
-    else:
-        st.caption("No preference contexts yet (needs repeated ticks/episodes).")
+    st.json(
+        {
+            "top": data.get("preference_top", []),
+            "last_update": data.get("last_preference_update"),
+        }
+    )
 
     # ---------------------------------
     # MEMORY TIMELINE (READ-ONLY)
     # ---------------------------------
     st.subheader("Memory Timeline (Recent)")
+
     memory = state.get("memory")
+
     if memory and hasattr(memory, "traces") and memory.traces:
         recent = memory.traces[-10:]
-        st.table([
-            {
-                "tick": t.tick,
-                "Z": round(t.Z, 3),
-                "coherence": round(t.coherence, 3),
-                "stability": round(t.stability, 3),
-                "frame": t.frame_signature,
-                "tags": ", ".join(t.tags),
-            }
-            for t in recent
-        ])
+        st.table(
+            [
+                {
+                    "tick": t.tick,
+                    "Z": round(t.Z, 3),
+                    "coherence": round(t.coherence, 3),
+                    "stability": round(t.stability, 3),
+                    "frame": t.frame_signature,
+                    "tags": ", ".join(t.tags),
+                }
+                for t in recent
+            ]
+        )
     else:
-        st.caption("No memory traces recorded yet (close a frame to commit).")
+        st.caption("No memory traces recorded yet.")
 
+    # ---------------------------------
+    # FINAL STATE
+    # ---------------------------------
     st.subheader("Final State")
     st.json(data)
