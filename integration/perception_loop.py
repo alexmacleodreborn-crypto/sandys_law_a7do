@@ -1,13 +1,16 @@
+# sandys_law_a7do/integration/perception_loop.py
 """
-Perception Loop — Phase 6.2 (ATTENTION PERSISTENCE)
+Perception Loop — Phase 6.1 (IMMUTABLE SAFE)
 
-- Generates perceptual fragments
-- Attention is READ-ONLY bias
-- Attention has temporal inertia
-- NO mutation of fragments
-- NO memory writes
+Responsibilities:
+- Generate perceptual fragments
+- Carry READ-ONLY attention as structural payload
+- NO mutation of Fragment instances
 - NO action selection
+- NO memory writes
 """
+
+from __future__ import annotations
 
 from typing import List
 
@@ -15,32 +18,30 @@ from sandys_law_a7do.frames.fragment import Fragment
 from sandys_law_a7do.accounting.attention import compute_attention_gain
 
 
-# ==================================================
-# CONFIG (LOCKED)
-# ==================================================
-
-ATTENTION_ALPHA = 0.85      # persistence strength
-ATTENTION_BASE = 1.0        # neutral baseline
-ATTENTION_MIN = 0.5
-ATTENTION_MAX = 1.5
-
-
-# ==================================================
-# MAIN LOOP
-# ==================================================
-
 def perceive_and_act(state: dict) -> List[Fragment]:
+    """
+    Phase 4–6 perception loop.
+
+    Generates fragments and embeds attention
+    as STRUCTURAL PAYLOAD (immutable-safe).
+    """
+
     fragments: List[Fragment] = []
 
-    # ---------------------------------------------
-    # Ensure attention state exists
-    # ---------------------------------------------
-    prev_attention = float(state.get("attention_level", ATTENTION_BASE))
+    # --------------------------------------------------
+    # BASE PERCEPTION (DEMO / PLACEHOLDER)
+    # --------------------------------------------------
+    base_payload = {"source": "demo"}
 
-    # ---------------------------------------------
-    # Default attention (neutral)
-    # ---------------------------------------------
-    new_attention = ATTENTION_BASE
+    # --------------------------------------------------
+    # PHASE 6.1 — ATTENTION (READ-ONLY)
+    # --------------------------------------------------
+    # Keep bounded and stable. Baseline attention is 1.0.
+    base_attention = 1.0
+
+    # Small bias multiplier so preference never explodes attention.
+    # compute_attention_gain should also be bounded, but we clamp anyway.
+    attention_gain = base_attention
 
     pref_store = state.get("preference_store")
     pref_engine = state.get("preference_engine")
@@ -59,38 +60,31 @@ def perceive_and_act(state: dict) -> List[Fragment]:
                 notes=notes,
             )
 
-            pref_score = pref_store.get(context_key)
+            pref_score = float(pref_store.get(context_key))
 
-            new_attention = compute_attention_gain(
-                preference_score=pref_score
+            # Convert preference score -> attention gain (read-only bias)
+            attention_gain = float(
+                compute_attention_gain(preference_score=pref_score)
             )
 
         except Exception:
             # Perception must NEVER fail
-            new_attention = ATTENTION_BASE
+            attention_gain = base_attention
 
-    # ---------------------------------------------
-    # Phase 6.2 — ATTENTION PERSISTENCE
-    # ---------------------------------------------
-    attention = (
-        ATTENTION_ALPHA * prev_attention
-        + (1.0 - ATTENTION_ALPHA) * new_attention
-    )
+    # Hard clamp (prevents “1 then jumps to 1.5” runaway, keeps graphs sane)
+    if attention_gain < 0.5:
+        attention_gain = 0.5
+    if attention_gain > 1.5:
+        attention_gain = 1.5
 
-    # Clamp (hard safety)
-    attention = max(ATTENTION_MIN, min(ATTENTION_MAX, attention))
-
-    # Store for next tick
-    state["attention_level"] = attention
-
-    # ---------------------------------------------
-    # Emit fragment (IMMUTABLE)
-    # ---------------------------------------------
+    # --------------------------------------------------
+    # CREATE FRAGMENT (IMMUTABLE)
+    # --------------------------------------------------
     frag = Fragment(
         kind="contact",
         payload={
-            "source": "demo",
-            "attention": attention,
+            **base_payload,
+            "attention": attention_gain,  # ✅ structural, immutable-safe
         },
     )
 
