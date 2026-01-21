@@ -1,11 +1,20 @@
+# sandys_law_a7do/interfaces/dashboard/dashboard_ui.py
+
 import streamlit as st
 import matplotlib.pyplot as plt
 
-from sandys_law_a7do.bootstrap import open_frame, add_fragment, close_frame
+from sandys_law_a7do.bootstrap import (
+    open_frame,
+    add_fragment,
+    close_frame,
+)
 from sandys_law_a7do.engine.tick_engine import step_tick
 
 
 def render_dashboard(state, snapshot):
+    # ---------------------------------
+    # INITIAL SNAPSHOT
+    # ---------------------------------
     data = snapshot()
     metrics = data["metrics"]
 
@@ -83,51 +92,61 @@ def render_dashboard(state, snapshot):
     state["history"]["Stability"].append(metrics["Stability"])
 
     # ---------------------------------
-    # METRIC EVOLUTION PLOT (IMPROVED)
+    # METRIC EVOLUTION PLOT
     # ---------------------------------
     st.subheader("Metric Evolution")
 
-    fig, ax1 = plt.subplots(figsize=(9, 4))
+    fig, ax = plt.subplots(figsize=(9, 4))
 
-    # Primary axis: Z (Fragmentation)
-    ax1.plot(
+    ax.plot(
         state["history"]["ticks"],
         state["history"]["Z"],
         label="Z (Fragmentation)",
-        color="tab:red",
-        linewidth=2,
+        color="red",
     )
-    ax1.set_xlabel("Tick")
-    ax1.set_ylabel("Fragmentation (Z)")
-    ax1.set_ylim(0.0, 1.0)
-
-    # Secondary axis: Coherence & Stability
-    ax2 = ax1.twinx()
-    ax2.plot(
+    ax.plot(
         state["history"]["ticks"],
         state["history"]["Coherence"],
         label="Coherence",
-        color="tab:blue",
-        linewidth=2,
+        color="blue",
     )
-    ax2.plot(
+    ax.plot(
         state["history"]["ticks"],
         state["history"]["Stability"],
         label="Stability",
-        color="tab:green",
-        linewidth=2,
+        color="green",
     )
-    ax2.set_ylabel("Coherence / Stability")
-    ax2.set_ylim(0.0, 1.05)
 
-    # Combined legend
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc="lower left")
-
-    ax1.grid(True)
+    ax.set_xlabel("Tick")
+    ax.set_ylabel("Value")
+    ax.legend()
+    ax.grid(True)
 
     st.pyplot(fig)
+
+    # ---------------------------------
+    # MEMORY TIMELINE (READ-ONLY)
+    # ---------------------------------
+    st.subheader("Memory Timeline (Recent)")
+
+    memory = state.get("memory")
+
+    if memory and hasattr(memory, "traces") and memory.traces:
+        recent = memory.traces[-10:]  # last 10 traces only
+
+        st.table([
+            {
+                "tick": t.trace_id,
+                "Z": round(t.features.get("Z", 0.0), 3),
+                "coherence": round(t.features.get("coherence", 0.0), 3),
+                "stability": round(t.features.get("stability", 0.0), 3),
+                "frame": t.features.get("frame_signature", "none"),
+                "tags": ", ".join(t.tags),
+            }
+            for t in recent
+        ])
+    else:
+        st.caption("No memory traces recorded yet.")
 
     # ---------------------------------
     # FINAL STATE
