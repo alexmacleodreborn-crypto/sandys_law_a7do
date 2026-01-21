@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 
 from ...bootstrap import (
     inject_demo_frame,
-    add_fragment_by_kind,
     close_frame,
     tick_system,
 )
@@ -16,53 +15,47 @@ def render_dashboard(state, snapshot):
     # CONTROLS (ACTIONS FIRST)
     # -------------------------------------------------
     st.subheader("Controls")
-    b1, b2, b3, b4 = st.columns(4)
+    c1, c2, c3 = st.columns(3)
 
-    if b1.button("🆕 New Frame"):
+    if c1.button("🆕 New Frame"):
         inject_demo_frame(state)
 
-    if b2.button("➕ Add Fragment"):
-        add_fragment_by_kind(state, "demo")
-
-    if b3.button("⏹ Close Frame"):
+    if c2.button("⏹ Close Frame"):
         close_frame(state)
 
-    if b4.button("⏭ Tick"):
+    if c3.button("⏭ Tick"):
         tick_system(state)
 
     # -------------------------------------------------
     # SNAPSHOT (AFTER ACTIONS)
     # -------------------------------------------------
     data = snapshot()
-    metrics = data["metrics"]
+    m = data["metrics"]
 
     # -------------------------------------------------
-    # SYSTEM OVERVIEW
+    # OVERVIEW
     # -------------------------------------------------
     st.subheader("System Overview")
-    st.json(
-        {
-            "ticks": data["ticks"],
-            "active_frame": (
-                f"{data['active_frame'].domain}:{data['active_frame'].label}"
-                if data["active_frame"]
-                else "none"
-            ),
-            "memory_count": data["memory_count"],
-        }
-    )
+    st.json({
+        "ticks": data["ticks"],
+        "active_frame": (
+            f"{data['active_frame'].domain}:{data['active_frame'].label}"
+            if data["active_frame"] else "none"
+        ),
+        "memory_count": data["memory_count"],
+    })
 
     # -------------------------------------------------
     # METRICS (CURRENT)
     # -------------------------------------------------
     st.subheader("Metrics")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Z (Fragmentation)", round(metrics["Z"], 3))
-    c2.metric("Coherence", round(metrics["Coherence"], 3))
-    c3.metric("Stability", round(metrics["Stability"], 3))
+    a, b, c = st.columns(3)
+    a.metric("Z", round(m["Z"], 3))
+    b.metric("Coherence", round(m["Coherence"], 3))
+    c.metric("Stability", round(m["Stability"], 3))
 
     # -------------------------------------------------
-    # METRIC EVOLUTION (TRUE PROGRESSION)
+    # METRIC EVOLUTION (REAL)
     # -------------------------------------------------
     st.subheader("Metric Evolution")
 
@@ -71,32 +64,28 @@ def render_dashboard(state, snapshot):
     if len(hist["ticks"]) > 1:
         fig, ax = plt.subplots(figsize=(9, 4))
 
-        ax.plot(hist["ticks"], hist["Z"], label="Z (Fragmentation)")
+        ax.plot(hist["ticks"], hist["Z"], label="Z")
         ax.plot(hist["ticks"], hist["Coherence"], label="Coherence")
         ax.plot(hist["ticks"], hist["Stability"], label="Stability")
 
-        # Crystallisation overlays
-        for i, t in enumerate(state.get("crystallisation_ticks", [])):
+        for i, t in enumerate(state["crystallisation_ticks"]):
             ax.axvline(
-                x=t,
+                t,
                 linestyle="--",
-                linewidth=1.5,
-                alpha=0.7,
+                alpha=0.6,
                 label="Crystallisation" if i == 0 else None,
             )
 
-        ax.set_xlabel("Tick")
-        ax.set_ylabel("Value")
         ax.set_ylim(0, 1)
+        ax.set_xlabel("Tick")
         ax.legend()
         ax.grid(True)
-
         st.pyplot(fig)
     else:
-        st.info("Run a few ticks to see metric evolution.")
+        st.info("Press Tick a few times to see dynamics.")
 
     # -------------------------------------------------
-    # FINAL STATE
+    # FINAL SNAPSHOT
     # -------------------------------------------------
-    st.subheader("Final State")
+    st.subheader("Final Snapshot")
     st.json(data)
