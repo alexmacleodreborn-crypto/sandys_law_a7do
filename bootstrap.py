@@ -1,23 +1,18 @@
 """
-Bootstrap v1.3 — A7DO Core
-
-Single source of truth for:
-- Frames
-- Metrics
-- Regulation
-- Memory
-- Time
+Bootstrap — v1.2
+A7DO Sandy’s Law Core
+Streamlit-safe, frame-stable, perception-driven
 """
 
 # =====================================================
-# CORE
+# CORE STRUCTURES
 # =====================================================
 
 from .frames.store import FrameStore
 from .frames.frame import Frame
 from .frames.fragment import Fragment
 
-from .mind.coherence import compute_coherence
+from .mind.coherence import compute_coherence, CoherenceReport
 from .mind.regulation import regulate
 
 # =====================================================
@@ -30,13 +25,13 @@ from .memory.crystallizer import crystallize
 from .memory.decay import decay_weight
 
 # =====================================================
-# PERCEPTION (Phase 4.1)
+# PERCEPTION
 # =====================================================
 
 from .integration.perception_loop import perceive_and_act
 
 # =====================================================
-# REGULATION CONSTANTS (FROZEN)
+# FROZEN REGULATION THRESHOLDS
 # =====================================================
 
 Z_MAX = 0.6
@@ -49,37 +44,65 @@ MEMORY_PERSIST_TICKS = 3
 # =====================================================
 
 def build_system():
+    frames = FrameStore()
+    memory = StructuralMemory()
+
     state = {
-        "frames": FrameStore(),
-        "memory": StructuralMemory(),
+        "frames": frames,
+        "memory": memory,
         "ticks": 0,
         "stable_ticks": 0,
-
-        # Metric history (ONLY written here)
-        "metric_history": {
+        "history": {
             "ticks": [],
             "Z": [],
             "Coherence": [],
             "Stability": [],
         },
-
-        # Visual markers
         "crystallisation_ticks": [],
     }
 
     def snapshot():
         return system_snapshot(state)
 
-    return snapshot, state
+    return None, snapshot, state
 
 
 # =====================================================
-# SNAPSHOT (READ-ONLY)
+# FRAME SAFETY (CRITICAL FOR STREAMLIT)
+# =====================================================
+
+def ensure_active_frame(state: dict):
+    """
+    Streamlit-safe guarantee that a frame exists.
+    Idempotent across reruns.
+    """
+    if state["frames"].active is None:
+        frame = Frame(domain="demo", label="ui")
+        state["frames"].open(frame)
+
+
+def inject_demo_frame(state: dict):
+    ensure_active_frame(state)
+
+
+def close_frame(state: dict):
+    state["frames"].close()
+
+
+def add_fragment_by_kind(state: dict, kind: str):
+    ensure_active_frame(state)
+    frag = Fragment(kind=kind)
+    state["frames"].add_fragment(frag)
+    return frag
+
+
+# =====================================================
+# SNAPSHOT
 # =====================================================
 
 def system_snapshot(state: dict) -> dict:
-    frames = state["frames"]
-    memory = state["memory"]
+    frames: FrameStore = state["frames"]
+    memory: StructuralMemory = state["memory"]
 
     active = frames.active
 
@@ -90,7 +113,11 @@ def system_snapshot(state: dict) -> dict:
         fragment_count = 0
         unique_actions = 0
 
-    report = compute_coherence(
+    # ----------------------------------------------
+    # COHERENCE REPORT (SOURCE OF TRUTH)
+    # ----------------------------------------------
+
+    report: CoherenceReport = compute_coherence(
         fragment_count=fragment_count,
         unique_actions=unique_actions,
         blocked_events=0,
@@ -115,71 +142,77 @@ def system_snapshot(state: dict) -> dict:
         },
         "regulation": regulation,
         "active_frame": active,
-        "memory_count": memory.count(),
+        "memory_count": state["memory"].count(),
     }
 
 
 # =====================================================
-# FRAME ACTIONS
-# =====================================================
-
-def inject_demo_frame(state: dict):
-    if state["frames"].active:
-        return
-    state["frames"].open(Frame(domain="demo", label="ui"))
-
-def close_frame(state: dict):
-    state["frames"].close()
-
-
-# =====================================================
-# TICK (ONLY PLACE STATE MUTATES OVER TIME)
+# TICK (THE HEART)
 # =====================================================
 
 def tick_system(state: dict):
+    """
+    One structural tick.
+    - Guarantees frame
+    - Runs perception
+    - Updates metrics
+    - Gates memory
+    """
+
+    # ----------------------------------------------
+    # CRITICAL: FRAME MUST EXIST ON EVERY RERUN
+    # ----------------------------------------------
+    ensure_active_frame(state)
+
     state["ticks"] += 1
 
-    # ---------------------------------------------
+    frame = state["frames"].active
+
+    # ----------------------------------------------
     # PERCEPTION → FRAGMENTS
-    # ---------------------------------------------
-    if state["frames"].active:
-        for frag in perceive_and_act(state):
-            state["frames"].add_fragment(frag)
+    # ----------------------------------------------
+    new_fragments = perceive_and_act(state)
 
-    # ---------------------------------------------
+    for frag in new_fragments:
+        frame.add(frag)
+
+    # ----------------------------------------------
     # METRICS
-    # ---------------------------------------------
+    # ----------------------------------------------
     snap = system_snapshot(state)
-    m = snap["metrics"]
+    metrics = snap["metrics"]
 
-    Z = m["Z"]
-    coherence = m["Coherence"]
-    stability = m["Stability"]
+    Z = metrics["Z"]
+    coherence = metrics["Coherence"]
+    stability = metrics["Stability"]
 
-    # ---------------------------------------------
-    # RECORD HISTORY (CRITICAL)
-    # ---------------------------------------------
-    hist = state["metric_history"]
-    hist["ticks"].append(state["ticks"])
-    hist["Z"].append(Z)
-    hist["Coherence"].append(coherence)
-    hist["Stability"].append(stability)
+    # ----------------------------------------------
+    # HISTORY (FOR PLOTTING)
+    # ----------------------------------------------
+    state["history"]["ticks"].append(state["ticks"])
+    state["history"]["Z"].append(Z)
+    state["history"]["Coherence"].append(coherence)
+    state["history"]["Stability"].append(stability)
 
-    # ---------------------------------------------
-    # REGULATION
-    # ---------------------------------------------
+    # ----------------------------------------------
+    # REGULATION GATE
+    # ----------------------------------------------
     allowed = (
         Z < Z_MAX
         and coherence >= COHERENCE_MIN
         and stability >= STABILITY_MIN
     )
 
+    # ----------------------------------------------
+    # MEMORY TRACE (MATCHES YOUR SCHEMA)
+    # ----------------------------------------------
     trace = MemoryTrace(
         trace_id=state["ticks"],
         features={
             "Z": Z,
             "coherence": coherence,
             "stability": stability,
+            "fragment_count": len(frame.fragments),
         },
     )
 
@@ -188,11 +221,8 @@ def tick_system(state: dict):
         state["memory"].add_trace(trace)
 
         if state["stable_ticks"] >= MEMORY_PERSIST_TICKS:
-            clusters = state["memory"].clusters()
-            if clusters:
-                crystallize(state["memory"])
-                state["crystallisation_ticks"].append(state["ticks"])
-            state["stable_ticks"] = 0
+            crystallize(state["memory"])
+            state["crystallisation_ticks"].append(state["ticks"])
     else:
         state["stable_ticks"] = 0
         decay_weight(state["memory"])
