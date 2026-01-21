@@ -91,17 +91,22 @@ def render_dashboard(state, snapshot):
     m2.metric("Coherence", round(metrics["Coherence"], 3))
     m3.metric("Stability", round(metrics["Stability"], 3))
 
-    # ---------------------------------
-    # RECORD HISTORY (EVENT + TICK SAFE)
-    # ---------------------------------
-    if state["record_history"] and state["last_recorded_tick"] != data["ticks"]:
-        state["history"]["ticks"].append(data["ticks"])
-        state["history"]["Z"].append(metrics["Z"])
-        state["history"]["Coherence"].append(metrics["Coherence"])
-        state["history"]["Stability"].append(metrics["Stability"])
+   # ---------------------------------
+# RECORD HISTORY (FRAME-AWARE + SAFE)
+# ---------------------------------
+should_record = (
+    data["active_frame"] is not None
+    or state["record_history"]
+)
 
-        state["last_recorded_tick"] = data["ticks"]
-        state["record_history"] = False
+if should_record and state["last_recorded_tick"] != data["ticks"]:
+    state["history"]["ticks"].append(data["ticks"])
+    state["history"]["Z"].append(metrics["Z"])
+    state["history"]["Coherence"].append(metrics["Coherence"])
+    state["history"]["Stability"].append(metrics["Stability"])
+
+    state["last_recorded_tick"] = data["ticks"]
+    state["record_history"] = False
 
     # ---------------------------------
     # METRIC EVOLUTION PLOT
