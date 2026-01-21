@@ -1,5 +1,3 @@
-# sandys_law_a7do/interfaces/dashboard/dashboard_ui.py
-
 import streamlit as st
 import matplotlib.pyplot as plt
 
@@ -11,10 +9,32 @@ from ...bootstrap import (
 )
 
 def render_dashboard(state, snapshot):
-    data = snapshot()
-    metrics = data["metrics"]
 
     st.title("A7DO — Sandy’s Law System Dashboard")
+
+    # -------------------------------------------------
+    # CONTROLS (ACTIONS FIRST)
+    # -------------------------------------------------
+    st.subheader("Controls")
+    b1, b2, b3, b4 = st.columns(4)
+
+    if b1.button("🆕 New Frame"):
+        inject_demo_frame(state)
+
+    if b2.button("➕ Add Fragment"):
+        add_fragment_by_kind(state, "demo")
+
+    if b3.button("⏹ Close Frame"):
+        close_frame(state)
+
+    if b4.button("⏭ Tick"):
+        tick_system(state)
+
+    # -------------------------------------------------
+    # SNAPSHOT (AFTER ACTIONS)
+    # -------------------------------------------------
+    data = snapshot()
+    metrics = data["metrics"]
 
     # -------------------------------------------------
     # SYSTEM OVERVIEW
@@ -40,24 +60,6 @@ def render_dashboard(state, snapshot):
     c1.metric("Z (Fragmentation)", round(metrics["Z"], 3))
     c2.metric("Coherence", round(metrics["Coherence"], 3))
     c3.metric("Stability", round(metrics["Stability"], 3))
-
-    # -------------------------------------------------
-    # CONTROLS
-    # -------------------------------------------------
-    st.subheader("Controls")
-    b1, b2, b3, b4 = st.columns(4)
-
-    if b1.button("🆕 New Frame"):
-        inject_demo_frame(state)
-
-    if b2.button("➕ Add Fragment"):
-        add_fragment_by_kind(state, "demo")
-
-    if b3.button("⏹ Close Frame"):
-        close_frame(state)
-
-    if b4.button("⏭ Tick"):
-        tick_system(state)
 
     # -------------------------------------------------
     # METRIC EVOLUTION (TRUE PROGRESSION)
