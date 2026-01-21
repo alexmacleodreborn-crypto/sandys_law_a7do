@@ -1,5 +1,6 @@
+# sandys_law_a7do/bootstrap.py
 """
-Bootstrap — v1.6 (LOCKED)
+Bootstrap — v1.7 (LOCKED)
 
 Implements:
 - Frame lifecycle
@@ -7,34 +8,25 @@ Implements:
 - Tick counter
 - OPTION A: Episode commit on frame close
 - Controlled perceptual diversity (Phase 4.1)
-- Coherence ⇄ Perception coupling (Phase 4.2)
 - Structural load & stability divergence (Phase 5)
-- Preference drift update on episode close (Phase 6) — READ-ONLY BIAS
-- Gate engine integration (Phase 7.3)
+- Preference drift (Phase 6, READ-ONLY)
+- Gate inertia & pressure (Phase 7.4)
 
-MemoryTrace signature (AUTHORITATIVE):
-MemoryTrace(
-    tick,
-    Z,
-    coherence,
-    stability,
-    frame_signature,
-    weight=1.0,
-    tags=[...]
-)
+NO reward
+NO action selection
+NO forgetting
 """
 
 # =====================================================
-# CORE STRUCTURE
+# CORE IMPORTS
 # =====================================================
 
 from sandys_law_a7do.frames.store import FrameStore
 from sandys_law_a7do.frames.frame import Frame
-from sandys_law_a7do.frames.fragment import Fragment
 
+from sandys_law_a7do.mind.perception import summarize_perception
 from sandys_law_a7do.mind.coherence import compute_coherence
 from sandys_law_a7do.mind.regulation import regulate
-from sandys_law_a7do.mind.perception import summarize_perception
 
 from sandys_law_a7do.mind.preference import (
     PreferenceEngine,
@@ -46,6 +38,7 @@ from sandys_law_a7do.memory.trace import MemoryTrace
 from sandys_law_a7do.memory.structural_memory import StructuralMemory
 
 from sandys_law_a7do.integration.perception_loop import perceive_and_act
+from sandys_law_a7do.gates.engine import GateEngine
 
 
 # =====================================================
@@ -56,17 +49,9 @@ def build_system():
     frames = FrameStore()
     memory = StructuralMemory()
 
-    # Phase 6 — preference (in-memory)
     pref_store = PreferenceStore()
-    pref_engine = PreferenceEngine(
-        store=pref_store,
-        cfg=PreferenceConfig(),
-    )
+    pref_engine = PreferenceEngine(store=pref_store, cfg=PreferenceConfig())
 
-    # -------------------------------------------------
-    # 🔑 CRITICAL FIX — LAZY IMPORT (breaks circular import)
-    # -------------------------------------------------
-    from sandys_law_a7do.gates.engine import GateEngine
     gate_engine = GateEngine()
 
     state = {
@@ -74,15 +59,15 @@ def build_system():
         "memory": memory,
         "ticks": 0,
 
-        # Phase 5 — temporal structural pressure
+        # Phase 5
         "structural_load": 0.0,
 
-        # Phase 6 — preference system (READ-ONLY bias)
-        "preference_engine": pref_engine,
+        # Phase 6
         "preference_store": pref_store,
+        "preference_engine": pref_engine,
         "last_preference_update": None,
 
-        # Phase 7 — gate system
+        # Phase 7
         "gate_engine": gate_engine,
     }
 
@@ -99,6 +84,7 @@ def build_system():
 def system_snapshot(state: dict) -> dict:
     frames: FrameStore = state["frames"]
     memory: StructuralMemory = state["memory"]
+    gate_engine: GateEngine = state.get("gate_engine")
 
     active = frames.active
 
@@ -112,7 +98,6 @@ def system_snapshot(state: dict) -> dict:
         fragment_count=percept.fragment_count,
         unique_actions=percept.unique_actions,
         blocked_events=0,
-        percept_notes=percept.notes,
     )
 
     Z = float(report.fragmentation)
@@ -121,19 +106,31 @@ def system_snapshot(state: dict) -> dict:
     load = float(state.get("structural_load", 0.0))
     stability = coherence * (1.0 - load)
 
-    regulation = regulate(
+    regulate(
         coherence=coherence,
         fragmentation=Z,
         block_rate=report.block_rate,
     )
 
-    # Phase 6 — preference visibility
-    pref_store: PreferenceStore = state["preference_store"]
-    top_contexts = pref_store.top(10)
+    # -----------------------------
+    # Gates snapshot
+    # -----------------------------
+    gates = {}
+    if gate_engine:
+        snap = gate_engine.snapshot()
+        for name, gs in snap.gates.items():
+            gates[name] = {
+                "open": gs.open,
+                "score": round(gs.score, 3),
+                "pressure": round(gs.pressure, 3),
+                "reason": gs.reason,
+            }
 
-    # Phase 7 — gate snapshot (SAFE)
-    gate_engine = state.get("gate_engine")
-    gate_snapshot = gate_engine.snapshot() if gate_engine else None
+    # -----------------------------
+    # Preferences (read-only)
+    # -----------------------------
+    pref_store: PreferenceStore = state["preference_store"]
+    top_prefs = pref_store.top(10)
 
     return {
         "ticks": state["ticks"],
@@ -143,19 +140,15 @@ def system_snapshot(state: dict) -> dict:
             "Stability": stability,
             "Load": load,
         },
-        "regulation": regulation,
         "active_frame": active,
         "memory_count": memory.count(),
 
         # Phase 6
-        "preference_top": [
-            {"context": k, "score": v}
-            for (k, v) in top_contexts
-        ],
+        "preference_top": [{"context": k, "score": v} for k, v in top_prefs],
         "last_preference_update": state.get("last_preference_update"),
 
         # Phase 7
-        "gates": gate_snapshot,
+        "gates": gates,
     }
 
 
@@ -166,31 +159,22 @@ def system_snapshot(state: dict) -> dict:
 def open_frame(state: dict):
     if state["frames"].active:
         return
-
-    frame = Frame(domain="demo", label="ui")
-    state["frames"].open(frame)
+    state["frames"].open(Frame(domain="demo", label="ui"))
 
 
 def add_fragment(state: dict):
-    """
-    Phase 4.1 — Controlled Perceptual Diversity
-    """
     frame = state["frames"].active
     if not frame:
         return
 
-    fragments = perceive_and_act(state)
-    for frag in fragments:
-        state["frames"].add_fragment(frag)
+    for frag in perceive_and_act(state):
+        frame.fragments.append(frag)
 
 
 def close_frame(state: dict):
-    """
-    OPTION A — EPISODE COMMIT ON FRAME CLOSE
-    + Phase 6 Preference Update
-    """
     frames: FrameStore = state["frames"]
     memory: StructuralMemory = state["memory"]
+    pref_engine: PreferenceEngine = state["preference_engine"]
 
     frame = frames.active
     if not frame:
@@ -203,29 +187,26 @@ def close_frame(state: dict):
         fragment_count=percept.fragment_count,
         unique_actions=percept.unique_actions,
         blocked_events=0,
-        percept_notes=percept.notes,
     )
 
     Z = float(report.fragmentation)
     coherence = float(report.coherence)
-
     load = float(state.get("structural_load", 0.0))
     stability = coherence * (1.0 - load)
 
-    trace = MemoryTrace(
-        state["ticks"],
-        Z,
-        coherence,
-        stability,
-        f"{frame.domain}:{frame.label}",
-        1.0,
-        ["episode", "stable"] if stability >= 0.7 else ["episode", "unstable"],
+    memory.add_trace(
+        MemoryTrace(
+            state["ticks"],
+            Z,
+            coherence,
+            stability,
+            f"{frame.domain}:{frame.label}",
+            1.0,
+            ["episode", "stable"] if stability >= 0.7 else ["episode", "unstable"],
+        )
     )
-    memory.add_trace(trace)
 
-    # Phase 6 — preference update
-    pref_engine: PreferenceEngine = state["preference_engine"]
-
+    # Preference update (bias only)
     context_key = pref_engine.context_key_from_accounting(
         coherence=coherence,
         fragmentation=Z,
@@ -233,7 +214,7 @@ def close_frame(state: dict):
         notes=percept.notes,
     )
 
-    update = pref_engine.update(
+    upd = pref_engine.update(
         context_key=context_key,
         coherence=coherence,
         fragmentation=Z,
@@ -243,11 +224,11 @@ def close_frame(state: dict):
 
     state["last_preference_update"] = {
         "tick": state["ticks"],
-        "context": update.context_key,
-        "previous": update.previous,
-        "updated": update.updated,
-        "delta": update.delta,
-        "reason": update.reason,
+        "context": upd.context_key,
+        "previous": upd.previous,
+        "updated": upd.updated,
+        "delta": upd.delta,
+        "reason": upd.reason,
     }
 
     state["structural_load"] *= 0.6
@@ -255,13 +236,10 @@ def close_frame(state: dict):
 
 
 # =====================================================
-# TICK — Phase 5 Structural Load
+# TICK — STRUCTURAL PRESSURE + GATES
 # =====================================================
 
 def tick_system(state: dict):
-    """
-    Phase 5 — Temporal structural pressure
-    """
     state["ticks"] += 1
 
     frames = state["frames"]
@@ -273,3 +251,14 @@ def tick_system(state: dict):
         load *= 0.6
 
     state["structural_load"] = max(0.0, min(1.0, load))
+
+    # ---- Gate step ----
+    gate_engine: GateEngine = state.get("gate_engine")
+    if gate_engine:
+        gate_engine.step(
+            context={
+                "load": state["structural_load"],
+                "frame_open": frames.active is not None,
+            },
+            tick=state["ticks"],
+        )
