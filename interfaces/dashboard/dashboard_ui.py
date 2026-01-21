@@ -1,5 +1,3 @@
-# sandys_law_a7do/interfaces/dashboard/dashboard_ui.py
-
 import streamlit as st
 import matplotlib.pyplot as plt
 
@@ -12,15 +10,28 @@ from sandys_law_a7do.engine.tick_engine import step_tick
 
 
 def render_dashboard(state, snapshot):
+    # ---------------------------------
+    # INITIAL SNAPSHOT
+    # ---------------------------------
     data = snapshot()
     metrics = data["metrics"]
 
     # ---------------------------------
-    # INIT HISTORY
+    # INIT HISTORY + FLAGS (ONCE)
     # ---------------------------------
     if "history" not in state:
-        state["history"] = {"ticks": [], "Z": [], "Coherence": [], "Stability": []}
-        state["last_tick"] = None
+        state["history"] = {
+            "ticks": [],
+            "Z": [],
+            "Coherence": [],
+            "Stability": [],
+        }
+
+    if "record_history" not in state:
+        state["record_history"] = False
+
+    if "last_recorded_tick" not in state:
+        state["last_recorded_tick"] = None
 
     # ---------------------------------
     # HEADER
@@ -30,22 +41,27 @@ def render_dashboard(state, snapshot):
     # ---------------------------------
     # CONTROLS
     # ---------------------------------
+    st.subheader("Controls")
     c1, c2, c3, c4 = st.columns(4)
 
     if c1.button("🆕 New Frame"):
         open_frame(state)
+        state["record_history"] = True
 
     if c2.button("➕ Add Fragment"):
         add_fragment(state)
+        state["record_history"] = True
 
     if c3.button("⏹ Close Frame"):
         close_frame(state)
+        state["record_history"] = True
 
     if c4.button("⏭ Tick"):
         step_tick(state, snapshot)
+        state["record_history"] = True
 
     # ---------------------------------
-    # SNAPSHOT
+    # SNAPSHOT AFTER CONTROLS
     # ---------------------------------
     data = snapshot()
     metrics = data["metrics"]
@@ -54,72 +70,93 @@ def render_dashboard(state, snapshot):
     # SYSTEM OVERVIEW
     # ---------------------------------
     st.subheader("System Overview")
-    st.json({
-        "ticks": data["ticks"],
-        "active_frame": (
-            f"{data['active_frame'].domain}:{data['active_frame'].label}"
-            if data["active_frame"] else "none"
-        ),
-        "memory_count": data["memory_count"],
-    })
+    st.json(
+        {
+            "ticks": data["ticks"],
+            "active_frame": (
+                f"{data['active_frame'].domain}:{data['active_frame'].label}"
+                if data["active_frame"]
+                else "none"
+            ),
+            "memory_count": data["memory_count"],
+        }
+    )
 
     # ---------------------------------
     # METRICS
     # ---------------------------------
+    st.subheader("Metrics")
     m1, m2, m3 = st.columns(3)
-    m1.metric("Z", round(metrics["Z"], 3))
+    m1.metric("Z (Fragmentation)", round(metrics["Z"], 3))
     m2.metric("Coherence", round(metrics["Coherence"], 3))
     m3.metric("Stability", round(metrics["Stability"], 3))
 
     # ---------------------------------
-    # HISTORY (SAFE)
+    # RECORD HISTORY (SAFE)
     # ---------------------------------
-    if state["last_tick"] != data["ticks"]:
+    should_record = (
+        data["active_frame"] is not None
+        or state["record_history"]
+    )
+
+    if should_record and state["last_recorded_tick"] != data["ticks"]:
         state["history"]["ticks"].append(data["ticks"])
         state["history"]["Z"].append(metrics["Z"])
         state["history"]["Coherence"].append(metrics["Coherence"])
         state["history"]["Stability"].append(metrics["Stability"])
-        state["last_tick"] = data["ticks"]
+
+        state["last_recorded_tick"] = data["ticks"]
+        state["record_history"] = False
 
     # ---------------------------------
-    # PLOT
+    # METRIC EVOLUTION PLOT
     # ---------------------------------
+    st.subheader("Metric Evolution")
+
     fig, ax = plt.subplots(figsize=(9, 4))
-    ax.plot(state["history"]["ticks"], state["history"]["Z"], label="Z")
-    ax.plot(state["history"]["ticks"], state["history"]["Coherence"], label="Coherence")
-    ax.plot(state["history"]["ticks"], state["history"]["Stability"], label="Stability")
-    ax.set_ylim(0, 1.05)
+
+    ax.plot(state["history"]["ticks"], state["history"]["Z"], label="Z", color="red")
+    ax.plot(state["history"]["ticks"], state["history"]["Coherence"], label="Coherence", color="blue")
+    ax.plot(state["history"]["ticks"], state["history"]["Stability"], label="Stability", color="green")
+
+    ax.set_xlabel("Tick")
+    ax.set_ylabel("Value")
+    ax.set_ylim(0.0, 1.05)
     ax.legend()
     ax.grid(True)
+
     st.pyplot(fig)
 
     # ---------------------------------
-    # GATES
+    # GATES (FIXED)
     # ---------------------------------
     st.subheader("Gates")
+
     gates = data.get("gates", {})
 
     if gates:
         st.table([
             {
                 "gate": name,
-                "open": info["open"],
-                "score": info["score"],
-                "pressure": info["pressure"],
-                "reason": info["reason"],
+                "state": info.get("state"),
+                "open": info.get("open"),
+                "reason": info.get("reason"),
+                "last_tick": info.get("last_tick"),
             }
             for name, info in gates.items()
         ])
     else:
-        st.caption("No gate data yet.")
+        st.caption("No gate data available.")
 
     # ---------------------------------
-    # MEMORY
+    # MEMORY TIMELINE
     # ---------------------------------
-    st.subheader("Memory (Recent)")
+    st.subheader("Memory Timeline (Recent)")
+
     memory = state.get("memory")
 
-    if memory and memory.traces:
+    if memory and hasattr(memory, "traces") and memory.traces:
+        recent = memory.traces[-10:]
         st.table([
             {
                 "tick": t.tick,
@@ -129,7 +166,13 @@ def render_dashboard(state, snapshot):
                 "frame": t.frame_signature,
                 "tags": ", ".join(t.tags),
             }
-            for t in memory.traces[-10:]
+            for t in recent
         ])
     else:
-        st.caption("No memory traces yet.")
+        st.caption("No memory traces recorded yet.")
+
+    # ---------------------------------
+    # FINAL STATE
+    # ---------------------------------
+    st.subheader("Final State")
+    st.json(data)
