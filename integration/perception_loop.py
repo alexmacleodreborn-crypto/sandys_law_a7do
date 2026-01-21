@@ -1,25 +1,50 @@
+# sandys_law_a7do/integration/perception_loop.py
 """
 Perception Loop — Phase 6.1 (IMMUTABLE SAFE)
 
-- Generates perceptual fragments
-- Embeds attention as STRUCTURAL PAYLOAD
-- No mutation
-- No memory
-- No actions
+Responsibilities:
+- Generate perceptual fragments (small structural diversity)
+- Carry READ-ONLY attention as structural payload
+- NO mutation of Fragment instances
+- NO action selection
+- NO memory writes
 """
 
+from __future__ import annotations
+
+import random
 from typing import List
 
 from sandys_law_a7do.frames.fragment import Fragment
 from sandys_law_a7do.accounting.attention import compute_attention_gain
 
 
+def _clip01(v: float) -> float:
+    v = float(v)
+    if v < 0.0:
+        return 0.0
+    if v > 1.0:
+        return 1.0
+    return v
+
+
 def perceive_and_act(state: dict) -> List[Fragment]:
+    """
+    Phase 4–6 perception loop.
+
+    Generates fragments and embeds attention
+    as STRUCTURAL PAYLOAD (immutable-safe).
+
+    Attention is computed from preference context (if available),
+    else defaults to neutral base.
+    """
+
     fragments: List[Fragment] = []
 
-    base_attention = 0.5
-    preference_bias = 1.0
-    attention_gain = base_attention * preference_bias
+    # ---------------------------
+    # Default attention (neutral)
+    # ---------------------------
+    attention_gain = 0.50
 
     pref_store = state.get("preference_store")
     pref_engine = state.get("preference_engine")
@@ -38,19 +63,42 @@ def perceive_and_act(state: dict) -> List[Fragment]:
                 notes=notes,
             )
 
-            pref_score = pref_store.get(context_key)
+            pref_score = float(pref_store.get(context_key))  # [-1..+1]
             attention_gain = compute_attention_gain(preference_score=pref_score)
 
         except Exception:
-            attention_gain = base_attention
+            attention_gain = 0.50
 
-    frag = Fragment(
-        kind="contact",
-        payload={
-            "source": "demo",
-            "attention": float(attention_gain),
-        },
+    # Defensive clip (never allow >1)
+    attention_gain = _clip01(attention_gain)
+
+    # --------------------------------------------------
+    # Controlled structural diversity (keeps Z moving)
+    # --------------------------------------------------
+    # Always a base "contact"
+    fragments.append(
+        Fragment(
+            kind="contact",
+            payload={"source": "demo", "attention": attention_gain},
+        )
     )
 
-    fragments.append(frag)
+    # Occasional novelty (30%)
+    if random.random() < 0.30:
+        fragments.append(
+            Fragment(
+                kind="novel",
+                payload={"source": "demo", "attention": attention_gain},
+            )
+        )
+
+    # Rare pressure (10%)
+    if random.random() < 0.10:
+        fragments.append(
+            Fragment(
+                kind="pressure",
+                payload={"source": "demo", "attention": attention_gain},
+            )
+        )
+
     return fragments
