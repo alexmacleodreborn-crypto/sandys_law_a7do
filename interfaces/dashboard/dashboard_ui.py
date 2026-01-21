@@ -27,6 +27,7 @@ def render_dashboard(state, snapshot):
             "Z": [],
             "Coherence": [],
             "Stability": [],
+            "Attention": [],
         }
 
     if "record_history" not in state:
@@ -41,7 +42,7 @@ def render_dashboard(state, snapshot):
     st.title("A7DO — Sandy’s Law System Dashboard")
 
     # ---------------------------------
-    # CONTROLS (STATE MUTATION ONLY HERE)
+    # CONTROLS
     # ---------------------------------
     st.subheader("Controls")
     c1, c2, c3, c4 = st.columns(4)
@@ -56,10 +57,10 @@ def render_dashboard(state, snapshot):
 
     if c3.button("⏹ Close Frame"):
         close_frame(state)
-        state["record_history"] = True   # episode boundary
+        state["record_history"] = True
 
     if c4.button("⏭ Tick"):
-        step_tick(state, snapshot)       # ONLY place tick is called
+        step_tick(state, snapshot)
         state["record_history"] = True
 
     # ---------------------------------
@@ -88,24 +89,35 @@ def render_dashboard(state, snapshot):
     # METRICS
     # ---------------------------------
     st.subheader("Metrics")
-    m1, m2, m3 = st.columns(3)
+    m1, m2, m3, m4 = st.columns(4)
     m1.metric("Z (Fragmentation)", round(metrics["Z"], 3))
     m2.metric("Coherence", round(metrics["Coherence"], 3))
     m3.metric("Stability", round(metrics["Stability"], 3))
+    m4.metric("Load", round(metrics.get("Load", 0.0), 3))
 
     # ---------------------------------
-    # RECORD HISTORY (FRAME-AWARE + SAFE)
+    # EXTRACT LATEST ATTENTION (SAFE)
     # ---------------------------------
-    should_record = (
-        data["active_frame"] is not None
-        or state["record_history"]
-    )
+    latest_attention = None
+    frame = data["active_frame"]
+
+    if frame and frame.fragments:
+        last_frag = frame.fragments[-1]
+        latest_attention = last_frag.payload.get("attention")
+
+    # ---------------------------------
+    # RECORD HISTORY (SAFE + FRAME AWARE)
+    # ---------------------------------
+    should_record = data["active_frame"] is not None or state["record_history"]
 
     if should_record and state["last_recorded_tick"] != data["ticks"]:
         state["history"]["ticks"].append(data["ticks"])
         state["history"]["Z"].append(metrics["Z"])
         state["history"]["Coherence"].append(metrics["Coherence"])
         state["history"]["Stability"].append(metrics["Stability"])
+        state["history"]["Attention"].append(
+            float(latest_attention) if latest_attention is not None else None
+        )
 
         state["last_recorded_tick"] = data["ticks"]
         state["record_history"] = False
@@ -145,7 +157,45 @@ def render_dashboard(state, snapshot):
     st.pyplot(fig)
 
     # ---------------------------------
-    # MEMORY TIMELINE (READ-ONLY)
+    # ATTENTION EVOLUTION
+    # ---------------------------------
+    st.subheader("Attention Signal")
+
+    if any(a is not None for a in state["history"]["Attention"]):
+        fig2, ax2 = plt.subplots(figsize=(9, 3))
+
+        ax2.plot(
+            state["history"]["ticks"],
+            state["history"]["Attention"],
+            label="Attention",
+            color="purple",
+        )
+
+        ax2.set_xlabel("Tick")
+        ax2.set_ylabel("Attention")
+        ax2.legend()
+        ax2.grid(True)
+
+        st.pyplot(fig2)
+    else:
+        st.caption("Attention will appear once fragments are generated.")
+
+    # ---------------------------------
+    # PREFERENCE STATE (READ-ONLY)
+    # ---------------------------------
+    st.subheader("Preference State")
+
+    if data.get("preference_top"):
+        st.table(data["preference_top"])
+    else:
+        st.caption("No preferences recorded yet.")
+
+    if data.get("last_preference_update"):
+        st.markdown("**Last Preference Update**")
+        st.json(data["last_preference_update"])
+
+    # ---------------------------------
+    # MEMORY TIMELINE
     # ---------------------------------
     st.subheader("Memory Timeline (Recent)")
 
@@ -169,7 +219,7 @@ def render_dashboard(state, snapshot):
         st.caption("No memory traces recorded yet.")
 
     # ---------------------------------
-    # FINAL STATE
+    # FINAL STATE (DEBUG)
     # ---------------------------------
-    st.subheader("Final State")
+    st.subheader("Final State (Debug)")
     st.json(data)
