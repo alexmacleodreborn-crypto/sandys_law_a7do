@@ -1,28 +1,53 @@
-"""
-A7DO — Sandy’s Law Dashboard UI
-Render-only module
-"""
+# sandys_law_a7do/interfaces/dashboard/dashboard_ui.py
 
 import streamlit as st
 import matplotlib.pyplot as plt
 
-from ...bootstrap import (
-    inject_demo_frame,
-    add_fragment_by_kind,
-    close_frame,
-    tick_system,
-)
+from sandys_law_a7do.bootstrap import open_frame, add_fragment, close_frame
+from sandys_law_a7do.engine.tick_engine import step_tick
 
 
 def render_dashboard(state, snapshot):
     data = snapshot()
     metrics = data["metrics"]
 
+    # ---------------------------------
+    # INIT HISTORY (ONCE)
+    # ---------------------------------
+    if "history" not in state:
+        state["history"] = {
+            "ticks": [],
+            "Z": [],
+            "Coherence": [],
+            "Stability": [],
+        }
+
+    # ---------------------------------
+    # HEADER
+    # ---------------------------------
     st.title("A7DO — Sandy’s Law System Dashboard")
 
-    # -------------------------------------------------
+    # ---------------------------------
+    # CONTROLS
+    # ---------------------------------
+    st.subheader("Controls")
+    c1, c2, c3, c4 = st.columns(4)
+
+    if c1.button("🆕 New Frame"):
+        open_frame(state)
+
+    if c2.button("➕ Add Fragment"):
+        add_fragment(state)
+
+    if c3.button("⏹ Close Frame"):
+        close_frame(state)
+
+    if c4.button("⏭ Tick"):
+        step_tick(state, snapshot)
+
+    # ---------------------------------
     # SYSTEM OVERVIEW
-    # -------------------------------------------------
+    # ---------------------------------
     st.subheader("System Overview")
     st.json(
         {
@@ -36,50 +61,33 @@ def render_dashboard(state, snapshot):
         }
     )
 
-    # -------------------------------------------------
+    # ---------------------------------
     # METRICS
-    # -------------------------------------------------
+    # ---------------------------------
     st.subheader("Metrics")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Z (Fragmentation)", round(metrics["Z"], 3))
-    c2.metric("Coherence", round(metrics["Coherence"], 3))
-    c3.metric("Stability", round(metrics["Stability"], 3))
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Z (Fragmentation)", round(metrics["Z"], 3))
+    m2.metric("Coherence", round(metrics["Coherence"], 3))
+    m3.metric("Stability", round(metrics["Stability"], 3))
 
-    # -------------------------------------------------
-    # CONTROLS (ORDER MATTERS)
-    # -------------------------------------------------
-    st.subheader("Controls")
-    b1, b2, b3, b4 = st.columns(4)
+    # ---------------------------------
+    # RECORD HISTORY
+    # ---------------------------------
+    state["history"]["ticks"].append(data["ticks"])
+    state["history"]["Z"].append(metrics["Z"])
+    state["history"]["Coherence"].append(metrics["Coherence"])
+    state["history"]["Stability"].append(metrics["Stability"])
 
-    if b1.button("🆕 New Frame"):
-        inject_demo_frame(state)
-
-    if b2.button("➕ Add Fragment"):
-        if state["frames"].active is None:
-            st.warning("No active frame. Open a frame first.")
-        else:
-            add_fragment_by_kind(state, "demo")
-
-    if b3.button("⏹ Close Frame"):
-        close_frame(state)
-
-    if b4.button("⏭ Tick"):
-        tick_system(state)
-
-    # -------------------------------------------------
+    # ---------------------------------
     # METRIC EVOLUTION
-    # -------------------------------------------------
+    # ---------------------------------
     st.subheader("Metric Evolution")
 
-    hist = state["metric_history"]
-
     fig, ax = plt.subplots(figsize=(9, 4))
-    ax.plot(hist["ticks"], hist["Z"], label="Z (Fragmentation)")
-    ax.plot(hist["ticks"], hist["Coherence"], label="Coherence")
-    ax.plot(hist["ticks"], hist["Stability"], label="Stability")
 
-    for t in state["crystallisation_ticks"]:
-        ax.axvline(t, linestyle="--", alpha=0.6)
+    ax.plot(state["history"]["ticks"], state["history"]["Z"], label="Z")
+    ax.plot(state["history"]["ticks"], state["history"]["Coherence"], label="Coherence")
+    ax.plot(state["history"]["ticks"], state["history"]["Stability"], label="Stability")
 
     ax.set_xlabel("Tick")
     ax.set_ylabel("Value")
@@ -88,8 +96,8 @@ def render_dashboard(state, snapshot):
 
     st.pyplot(fig)
 
-    # -------------------------------------------------
+    # ---------------------------------
     # FINAL STATE
-    # -------------------------------------------------
+    # ---------------------------------
     st.subheader("Final State")
     st.json(data)
