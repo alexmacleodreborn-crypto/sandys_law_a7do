@@ -1,13 +1,11 @@
-# sandys_law_a7do/integration/perception_loop.py
 """
-Perception Loop — Phase 6.2 (IMMUTABLE SAFE)
+Perception Loop — Phase 6.1 (IMMUTABLE SAFE)
 
-Responsibilities:
-- Generate perceptual fragments continuously
-- Embed READ-ONLY attention as payload (no mutation of Fragment)
-- NO memory writes
-- NO action selection
-- NEVER throw (perception must not crash the app)
+- Generates perceptual fragments
+- Embeds attention as STRUCTURAL PAYLOAD
+- No mutation
+- No memory
+- No actions
 """
 
 from typing import List
@@ -19,8 +17,9 @@ from sandys_law_a7do.accounting.attention import compute_attention_gain
 def perceive_and_act(state: dict) -> List[Fragment]:
     fragments: List[Fragment] = []
 
-    base_attention = 1.0
-    attention_gain = base_attention
+    base_attention = 0.5
+    preference_bias = 1.0
+    attention_gain = base_attention * preference_bias
 
     pref_store = state.get("preference_store")
     pref_engine = state.get("preference_engine")
@@ -39,11 +38,9 @@ def perceive_and_act(state: dict) -> List[Fragment]:
                 notes=notes,
             )
 
-            pref_score = float(pref_store.get(context_key))
+            pref_score = pref_store.get(context_key)
+            attention_gain = compute_attention_gain(preference_score=pref_score)
 
-            attention_gain = float(
-                compute_attention_gain(preference_score=pref_score)
-            )
         except Exception:
             attention_gain = base_attention
 
