@@ -1,33 +1,43 @@
 # sandys_law_a7do/integration/perception_loop.py
+"""
+Phase 4.1 — Minimal Perceptual Variation
+
+Purpose:
+- Introduce controlled structural diversity
+- Allow Z to move without destabilising the system
+- Preserve Sandy’s Law constraints
+"""
 
 import random
 from sandys_law_a7do.frames.fragment import Fragment
 
-# --------------------------------------------------
-# Minimal embodied perception loop
-# --------------------------------------------------
 
 def perceive_and_act(state):
     """
-    Generate structural fragments from a minimal 'world'.
-    No semantics. No rewards. Just variation.
-    """
+    Minimal embodied perception loop.
 
-    # Simulated sensory variation (placeholder for real world)
-    sensory_load = random.choice(["low", "med", "high"])
-    novelty = random.choice([0, 1])
+    Produces small structural variation only.
+    No semantics, no reward, no goals.
+    """
 
     fragments = []
 
-    # Load fragment
-    fragments.append(
-        Fragment(kind=f"load:{sensory_load}")
-    )
+    # --------------------------------------------------
+    # Base environmental load (always present)
+    # --------------------------------------------------
+    load_level = random.choice(["low", "medium"])
+    fragments.append(Fragment(kind=f"load:{load_level}"))
 
-    # Novelty fragment (sometimes)
-    if novelty:
-        fragments.append(
-            Fragment(kind="novel")
-        )
+    # --------------------------------------------------
+    # Occasional novelty (30% chance)
+    # --------------------------------------------------
+    if random.random() < 0.3:
+        fragments.append(Fragment(kind="novel"))
+
+    # --------------------------------------------------
+    # Rare pressure spike (10% chance)
+    # --------------------------------------------------
+    if random.random() < 0.1:
+        fragments.append(Fragment(kind="pressure"))
 
     return fragments
