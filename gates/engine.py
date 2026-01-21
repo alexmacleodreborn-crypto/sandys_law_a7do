@@ -1,23 +1,23 @@
 # sandys_law_a7do/gates/engine.py
 
-from __future__ import annotations
 from dataclasses import dataclass
-from typing import Dict, Any, List
+from typing import Dict, Optional
 
+# ✅ IMPORT RULES FACTORY
 from sandys_law_a7do.gates.rules import GateRule, default_gate_rules
 
 
 # =====================================================
-# Gate State (Phase 7.4)
+# GATE STATE
 # =====================================================
 
 @dataclass
 class GateState:
-    open: bool
-    score: float          # ∈ [0,1] inertia
-    pressure: float       # instantaneous load
-    reason: str
-    last_tick: int
+    name: str
+    score: float = 0.0
+    pressure: float = 0.0
+    open: bool = False
+    reason: str = "init"
 
 
 @dataclass
@@ -26,68 +26,56 @@ class GateSnapshot:
 
 
 # =====================================================
-# Gate Engine
+# GATE ENGINE
 # =====================================================
 
 class GateEngine:
     """
-    Phase 7.4 — Stateful gates with inertia.
+    Structural gating engine.
 
-    - Gates evaluate every tick
-    - Gates accumulate pressure when blocking
-    - Score drifts slowly, bounded
-    - NO reward
-    - NO preference
-    - NO memory
+    - No learning
+    - No reward
+    - No action selection
+    - Gates accumulate pressure and inertia
     """
 
-    def __init__(self, rules: List[GateRule] | None = None):
-        self.rules = rules or default_gate_rules()
-        self._states: Dict[str, GateState] = {}
+    def __init__(self, rules: Optional[list[GateRule]] = None):
+        # ✅ FIX: rules factory now exists
+        self.rules: list[GateRule] = rules or default_gate_rules()
+
+        self.gates: Dict[str, GateState] = {
+            rule.name: GateState(name=rule.name)
+            for rule in self.rules
+        }
 
     # -------------------------------------------------
+    # STEP
+    # -------------------------------------------------
 
-    def step(self, *, context: Dict[str, Any], tick: int) -> None:
+    def step(self, *, context: dict, tick: int):
+        """
+        Advance gate state by one tick.
+        """
         for rule in self.rules:
-            name = rule.name
-            allowed, reason = rule.evaluate(context)
+            gate = self.gates[rule.name]
 
-            prev = self._states.get(
-                name,
-                GateState(
-                    open=True,
-                    score=0.0,
-                    pressure=0.0,
-                    reason="init",
-                    last_tick=tick,
-                ),
+            decision = rule.evaluate(
+                context=context,
+                state=gate,
+                tick=tick,
             )
 
-            # ------------------------------
-            # Pressure update
-            # ------------------------------
-            if allowed:
-                pressure = max(0.0, prev.pressure * 0.7)
-            else:
-                pressure = min(1.0, prev.pressure + 0.15)
+            gate.score = decision.score
+            gate.pressure = decision.pressure
+            gate.open = decision.open
+            gate.reason = decision.reason
 
-            # ------------------------------
-            # Score inertia update
-            # ------------------------------
-            if not allowed:
-                score = min(1.0, prev.score + 0.05)
-            else:
-                score = max(0.0, prev.score * 0.95)
-
-            self._states[name] = GateState(
-                open=allowed,
-                score=score,
-                pressure=pressure,
-                reason=reason,
-                last_tick=tick,
-            )
-
+    # -------------------------------------------------
+    # SNAPSHOT
     # -------------------------------------------------
 
     def snapshot(self) -> GateSnapshot:
-        return GateSnapshot(gates=dict(self._states))
+        """
+        Read-only snapshot for dashboards.
+        """
+        return GateSnapshot(gates=dict(self.gates))
