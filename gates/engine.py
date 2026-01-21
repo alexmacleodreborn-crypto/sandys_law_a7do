@@ -1,90 +1,93 @@
-"""
-Gate Engine — Phase 7.3 (STRUCTURAL, READ-ONLY)
+# sandys_law_a7do/gates/engine.py
 
-Responsibilities:
-- Evaluate gate rules against system snapshot
-- Maintain internal gate scores
-- Expose READ-ONLY snapshots for dashboards / downstream use
-
-NO:
-- control
-- blocking
-- routing
-- action selection
-"""
-
-from dataclasses import dataclass, field
+from __future__ import annotations
+from dataclasses import dataclass
 from typing import Dict, Any, List
 
 from sandys_law_a7do.gates.rules import GateRule, default_gate_rules
 
 
-# --------------------------------------------------
-# Gate State (internal, mutable)
-# --------------------------------------------------
+# =====================================================
+# Gate State (Phase 7.4)
+# =====================================================
 
 @dataclass
 class GateState:
-    """
-    Internal gate state (scores only).
-    """
-    scores: Dict[str, float] = field(default_factory=dict)
+    open: bool
+    score: float          # ∈ [0,1] inertia
+    pressure: float       # instantaneous load
+    reason: str
+    last_tick: int
 
 
-# --------------------------------------------------
-# Gate Snapshot (external, immutable)
-# --------------------------------------------------
-
-@dataclass(frozen=True)
+@dataclass
 class GateSnapshot:
-    """
-    Read-only gate snapshot.
-    """
-    scores: Dict[str, float]
+    gates: Dict[str, GateState]
 
 
-# --------------------------------------------------
+# =====================================================
 # Gate Engine
-# --------------------------------------------------
+# =====================================================
 
 class GateEngine:
     """
-    Evaluates structural gates.
+    Phase 7.4 — Stateful gates with inertia.
 
-    IMPORTANT:
-    - Gates do NOT block
-    - Gates do NOT select
-    - Gates only SCORE
+    - Gates evaluate every tick
+    - Gates accumulate pressure when blocking
+    - Score drifts slowly, bounded
+    - NO reward
+    - NO preference
+    - NO memory
     """
 
     def __init__(self, rules: List[GateRule] | None = None):
-        self.rules: List[GateRule] = rules or list(default_gate_rules)
-        self.state = GateState()
+        self.rules = rules or default_gate_rules()
+        self._states: Dict[str, GateState] = {}
 
-    # ----------------------------------------------
-    # Evaluate gates against system snapshot
-    # ----------------------------------------------
+    # -------------------------------------------------
 
-    def evaluate(self, system_snapshot: Dict[str, Any]) -> None:
-        """
-        Update internal gate scores from snapshot.
-        """
+    def step(self, *, context: Dict[str, Any], tick: int) -> None:
         for rule in self.rules:
-            try:
-                score = float(rule.evaluator(system_snapshot))
-            except Exception:
-                score = 0.0
+            name = rule.name
+            allowed, reason = rule.evaluate(context)
 
-            # Clamp to [0, 1]
-            score = max(0.0, min(1.0, score))
-            self.state.scores[rule.name] = score
+            prev = self._states.get(
+                name,
+                GateState(
+                    open=True,
+                    score=0.0,
+                    pressure=0.0,
+                    reason="init",
+                    last_tick=tick,
+                ),
+            )
 
-    # ----------------------------------------------
-    # REQUIRED METHOD (THIS FIXES YOUR ERROR)
-    # ----------------------------------------------
+            # ------------------------------
+            # Pressure update
+            # ------------------------------
+            if allowed:
+                pressure = max(0.0, prev.pressure * 0.7)
+            else:
+                pressure = min(1.0, prev.pressure + 0.15)
+
+            # ------------------------------
+            # Score inertia update
+            # ------------------------------
+            if not allowed:
+                score = min(1.0, prev.score + 0.05)
+            else:
+                score = max(0.0, prev.score * 0.95)
+
+            self._states[name] = GateState(
+                open=allowed,
+                score=score,
+                pressure=pressure,
+                reason=reason,
+                last_tick=tick,
+            )
+
+    # -------------------------------------------------
 
     def snapshot(self) -> GateSnapshot:
-        """
-        Return a read-only snapshot of gate scores.
-        """
-        return GateSnapshot(scores=dict(self.state.scores))
+        return GateSnapshot(gates=dict(self._states))
