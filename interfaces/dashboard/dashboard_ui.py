@@ -1,5 +1,3 @@
-# sandys_law_a7do/interfaces/dashboard/dashboard_ui.py
-
 import streamlit as st
 import matplotlib.pyplot as plt
 
@@ -85,20 +83,49 @@ def render_dashboard(state, snapshot):
     state["history"]["Stability"].append(metrics["Stability"])
 
     # ---------------------------------
-    # METRIC EVOLUTION PLOT
+    # METRIC EVOLUTION PLOT (IMPROVED)
     # ---------------------------------
     st.subheader("Metric Evolution")
 
-    fig, ax = plt.subplots(figsize=(9, 4))
+    fig, ax1 = plt.subplots(figsize=(9, 4))
 
-    ax.plot(state["history"]["ticks"], state["history"]["Z"], label="Z")
-    ax.plot(state["history"]["ticks"], state["history"]["Coherence"], label="Coherence")
-    ax.plot(state["history"]["ticks"], state["history"]["Stability"], label="Stability")
+    # Primary axis: Z (Fragmentation)
+    ax1.plot(
+        state["history"]["ticks"],
+        state["history"]["Z"],
+        label="Z (Fragmentation)",
+        color="tab:red",
+        linewidth=2,
+    )
+    ax1.set_xlabel("Tick")
+    ax1.set_ylabel("Fragmentation (Z)")
+    ax1.set_ylim(0.0, 1.0)
 
-    ax.set_xlabel("Tick")
-    ax.set_ylabel("Value")
-    ax.legend()
-    ax.grid(True)
+    # Secondary axis: Coherence & Stability
+    ax2 = ax1.twinx()
+    ax2.plot(
+        state["history"]["ticks"],
+        state["history"]["Coherence"],
+        label="Coherence",
+        color="tab:blue",
+        linewidth=2,
+    )
+    ax2.plot(
+        state["history"]["ticks"],
+        state["history"]["Stability"],
+        label="Stability",
+        color="tab:green",
+        linewidth=2,
+    )
+    ax2.set_ylabel("Coherence / Stability")
+    ax2.set_ylim(0.0, 1.05)
+
+    # Combined legend
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc="lower left")
+
+    ax1.grid(True)
 
     st.pyplot(fig)
 
