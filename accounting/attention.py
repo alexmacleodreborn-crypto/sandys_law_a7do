@@ -1,36 +1,51 @@
 # sandys_law_a7do/accounting/attention.py
+"""
+Attention Gain — Phase 6.x (BOUNDED)
 
-from typing import Optional
+Attention is a structural scalar in [0..1].
+It is NOT reward, NOT value, NOT action selection.
+
+Inputs:
+- preference_score in [-1..+1] (stored bias toward stability)
+
+Output:
+- attention_gain in [0..1]
+"""
+
+from __future__ import annotations
+
+
+def _clip01(v: float) -> float:
+    v = float(v)
+    if v < 0.0:
+        return 0.0
+    if v > 1.0:
+        return 1.0
+    return v
 
 
 def compute_attention_gain(
     *,
-    preference_score: Optional[float],
-    base: float = 1.0,
-    strength: float = 0.5,
-    min_gain: float = 0.5,
-    max_gain: float = 1.5,
+    preference_score: float,
+    base: float = 0.50,
+    span: float = 0.45,
 ) -> float:
     """
-    Phase 6.1 — Preference-weighted attention (READ-ONLY)
+    Map preference_score [-1..+1] -> attention [0..1].
 
-    Maps preference score ∈ [-1, +1] into a soft attention gain.
-
-    - No filtering
-    - No decisions
-    - No reward
-    - No persistence
-
-    gain = base + strength * preference_score
+    - base is the default attention when preference is neutral
+    - span is how much preference can move attention up/down
     """
+    # Ensure preference is in [-1..+1]
+    ps = float(preference_score)
+    if ps < -1.0:
+        ps = -1.0
+    if ps > 1.0:
+        ps = 1.0
 
-    if preference_score is None:
-        return base
-
-    gain = base + strength * float(preference_score)
-
-    if gain < min_gain:
-        return min_gain
-    if gain > max_gain:
-        return max_gain
-    return gain
+    # Linear bounded map:
+    # ps=-1 -> base - span
+    # ps= 0 -> base
+    # ps=+1 -> base + span
+    gain = float(base) + float(span) * ps
+    return _clip01(gain)
