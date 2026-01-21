@@ -136,7 +136,7 @@ def render_dashboard(state, snapshot):
 
         st.table([
             {
-                "tick": t.trace_id,
+                "tick": t.tick,
                 "Z": round(t.features.get("Z", 0.0), 3),
                 "coherence": round(t.features.get("coherence", 0.0), 3),
                 "stability": round(t.features.get("stability", 0.0), 3),
