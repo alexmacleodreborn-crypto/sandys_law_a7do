@@ -1,74 +1,51 @@
 # sandys_law_a7do/engine/tick_engine.py
 
-from sandys_law_a7do.memory.trace import MemoryTrace
+"""
+Tick Engine — v1.1 (Perception Wired)
 
-# --------------------------------------------------
-# REGULATION THRESHOLDS (FROZEN)
-# --------------------------------------------------
-Z_MAX = 0.6
-COHERENCE_MIN = 0.7
-STABILITY_MIN = 0.7
+Implements:
+- Tick progression
+- Perceptual variation injection
+- Metric evolution (NO learning here)
+
+Learning remains episode-based (frame close).
+"""
+
+from sandys_law_a7do.mind.perception import perceive
+from sandys_law_a7do.frames.fragment import Fragment
 
 
 def step_tick(state: dict, snapshot):
     """
-    Advance system by one tick.
+    Single system tick.
 
-    - Always records experience (trace_log)
-    - Only consolidates memory if regulation allows
-    - MATCHES REAL MemoryTrace SIGNATURE (POSITIONAL)
+    Rules:
+    - Advances time
+    - Injects perceptual variation
+    - Does NOT write memory
+    - Does NOT close frames
     """
 
-    # ---------------------------------
-    # ADVANCE TIME
-    # ---------------------------------
+    frames = state["frames"]
+    active = frames.active
+
+    # -----------------------------
+    # ADVANCE TICK
+    # -----------------------------
     state["ticks"] += 1
 
-    data = snapshot()
-    metrics = data["metrics"]
+    # -----------------------------
+    # PERCEPTION → STRUCTURE
+    # -----------------------------
+    if active:
+        percepts = perceive(state)
 
-    Z = metrics["Z"]
-    coherence = metrics["Coherence"]
-    stability = metrics["Stability"]
+        for p in percepts:
+            # Safety: perception must only add fragments
+            if isinstance(p, Fragment):
+                frames.add_fragment(p)
 
-    # ---------------------------------
-    # REGULATION DECISION
-    # ---------------------------------
-    allowed = (
-        Z < Z_MAX
-        and coherence >= COHERENCE_MIN
-        and stability >= STABILITY_MIN
-    )
-
-    # ---------------------------------
-    # FRAME SIGNATURE (SAFE)
-    # ---------------------------------
-    frame = data.get("active_frame")
-    frame_signature = (
-        f"{frame.domain}:{frame.label}"
-        if frame is not None
-        else "none"
-    )
-
-    # ---------------------------------
-    # CREATE MEMORY TRACE (POSITIONAL)
-    # ---------------------------------
-    trace = MemoryTrace(
-        state["ticks"],     # tick
-        Z,                  # fragmentation
-        coherence,           # coherence
-        stability,           # stability
-        frame_signature,     # frame signature
-        tags=["stable"] if allowed else ["unstable"],
-    )
-
-    # ---------------------------------
-    # ALWAYS RECORD EXPERIENCE
-    # ---------------------------------
-    state["memory"].trace_log.append(trace)
-
-    # ---------------------------------
-    # ONLY CONSOLIDATE IF ALLOWED
-    # ---------------------------------
-    if allowed:
-        state["memory"].add_trace(trace)
+    # -----------------------------
+    # SNAPSHOT ONLY (NO SIDE EFFECTS)
+    # -----------------------------
+    snapshot()
