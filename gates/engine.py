@@ -1,81 +1,80 @@
 # sandys_law_a7do/gates/engine.py
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 
-from sandys_law_a7do.gates.rules import GateRule, GateDecision, default_gate_rules
-
-# =====================================================
-# GATE DECISION
-# =====================================================
-
-@dataclass
-class GateDecision:
-    score: float
-    pressure: float
-    open: bool
-    reason: str
+from sandys_law_a7do.gates.rules import GateRule, default_gate_rules
 
 
 # =====================================================
-# GATE RULE
+# Gate State Containers
 # =====================================================
 
-@dataclass
-class GateRule:
-    """
-    Structural gate rule.
-
-    Rules do NOT:
-    - select actions
-    - learn
-    - store memory
-    """
-
+@dataclass(frozen=True)
+class GateState:
     name: str
-    evaluator: Callable[[Dict, float, int], GateDecision]
+    score: float
+    threshold: float
+    open: bool
 
-    def evaluate(self, *, context: Dict, state, tick: int) -> GateDecision:
-        return self.evaluator(context, state, tick)
+
+@dataclass(frozen=True)
+class GateSnapshot:
+    gates: Dict[str, GateState]
+
+    def open_gates(self) -> List[str]:
+        return [k for k, g in self.gates.items() if g.open]
 
 
 # =====================================================
-# DEFAULT GATE RULES (FACTORY)
+# Gate Engine
 # =====================================================
 
-def default_gate_rules() -> list[GateRule]:
+class GateEngine:
     """
-    Canonical gate set.
-    These gates operate ONLY on structural metrics.
+    Structural gate evaluator.
+
+    - No memory
+    - No learning
+    - No decisions
+    - Only computes openness from structural metrics
     """
 
-    def perception_gate(ctx, state, tick):
-        coherence = float(ctx.get("coherence", 0.0))
-        pressure = state.pressure + (0.1 if coherence < 0.4 else -0.05)
+    def __init__(self, rules: Optional[List[GateRule]] = None) -> None:
+        self.rules: List[GateRule] = rules or default_gate_rules()
+        self._last_snapshot: Optional[GateSnapshot] = None
 
-        pressure = max(0.0, min(1.0, pressure))
-        open_gate = pressure < 0.6
+    # -------------------------------------------------
+    # Evaluation
+    # -------------------------------------------------
 
-        return GateDecision(
-            score=coherence,
-            pressure=pressure,
-            open=open_gate,
-            reason="low_coherence" if not open_gate else "stable",
-        )
+    def evaluate(self, context: Dict[str, float]) -> GateSnapshot:
+        gates: Dict[str, GateState] = {}
 
-    def load_gate(ctx, state, tick):
-        load = float(ctx.get("load", 0.0))
-        pressure = state.pressure + load * 0.1
-        pressure = max(0.0, min(1.0, pressure))
+        for rule in self.rules:
+            try:
+                score = float(rule.evaluator(context))
+            except Exception:
+                score = 0.0
 
-        return GateDecision(
-            score=1.0 - load,
-            pressure=pressure,
-            open=pressure < 0.7,
-            reason="high_load" if pressure >= 0.7 else "ok",
-        )
+            open_ = score >= rule.threshold
 
-    return [
-        GateRule(name="perception", evaluator=perception_gate),
-        GateRule(name="load", evaluator=load_gate),
-    ]
+            gates[rule.name] = GateState(
+                name=rule.name,
+                score=score,
+                threshold=rule.threshold,
+                open=open_,
+            )
+
+        snap = GateSnapshot(gates=gates)
+        self._last_snapshot = snap
+        return snap
+
+    # -------------------------------------------------
+    # Snapshot access
+    # -------------------------------------------------
+
+    def snapshot(self) -> Optional[GateSnapshot]:
+        return self._last_snapshot
