@@ -19,7 +19,7 @@ def render_dashboard(state, snapshot):
     metrics = data["metrics"]
 
     # ---------------------------------
-    # INIT HISTORY + FLAGS (ONCE)
+    # INIT HISTORY + EVENT FLAG (ONCE)
     # ---------------------------------
     if "history" not in state:
         state["history"] = {
@@ -51,11 +51,11 @@ def render_dashboard(state, snapshot):
 
     if c3.button("⏹ Close Frame"):
         close_frame(state)
-        state["record_history"] = True   # ✅ event-based history
+        state["record_history"] = True   # ✅ episode boundary
 
     if c4.button("⏭ Tick"):
         step_tick(state, snapshot)       # ✅ ONLY place tick is called
-        state["record_history"] = True   # ✅ event-based history
+        state["record_history"] = True   # ✅ real system event
 
     # ---------------------------------
     # SNAPSHOT AFTER CONTROLS
@@ -91,7 +91,7 @@ def render_dashboard(state, snapshot):
     # ---------------------------------
     # RECORD HISTORY (EVENT-BASED ONLY)
     # ---------------------------------
-    if state.get("record_history"):
+    if state["record_history"]:
         state["history"]["ticks"].append(data["ticks"])
         state["history"]["Z"].append(metrics["Z"])
         state["history"]["Coherence"].append(metrics["Coherence"])
@@ -121,42 +121,4 @@ def render_dashboard(state, snapshot):
         state["history"]["ticks"],
         state["history"]["Stability"],
         label="Stability",
-        color="green",
-    )
-
-    ax.set_xlabel("Tick")
-    ax.set_ylabel("Value")
-    ax.legend()
-    ax.grid(True)
-
-    st.pyplot(fig)
-
-    # ---------------------------------
-    # MEMORY TIMELINE (READ-ONLY)
-    # ---------------------------------
-    st.subheader("Memory Timeline (Recent)")
-
-    memory = state.get("memory")
-
-    if memory and hasattr(memory, "traces") and memory.traces:
-        recent = memory.traces[-10:]  # last 10 traces
-
-        st.table([
-            {
-                "tick": t.tick,
-                "Z": round(t.Z, 3),
-                "coherence": round(t.coherence, 3),
-                "stability": round(t.stability, 3),
-                "frame": t.frame_signature,
-                "tags": ", ".join(t.tags),
-            }
-            for t in recent
-        ])
-    else:
-        st.caption("No memory traces recorded yet.")
-
-    # ---------------------------------
-    # FINAL STATE
-    # ---------------------------------
-    st.subheader("Final State")
-    st.json(data)
+       
