@@ -28,7 +28,7 @@ def render_dashboard(state, snapshot):
     st.title("A7DO — Sandy’s Law System Dashboard")
 
     # ---------------------------------
-    # CONTROLS
+    # CONTROLS (STATE MUTATION ONLY HERE)
     # ---------------------------------
     st.subheader("Controls")
     c1, c2, c3, c4 = st.columns(4)
@@ -43,7 +43,13 @@ def render_dashboard(state, snapshot):
         close_frame(state)
 
     if c4.button("⏭ Tick"):
-        step_tick(state, snapshot)
+        step_tick(state, snapshot)   # ✅ ONLY place tick is called
+
+    # ---------------------------------
+    # SNAPSHOT AFTER CONTROLS
+    # ---------------------------------
+    data = snapshot()
+    metrics = data["metrics"]
 
     # ---------------------------------
     # SYSTEM OVERVIEW
@@ -71,7 +77,7 @@ def render_dashboard(state, snapshot):
     m3.metric("Stability", round(metrics["Stability"], 3))
 
     # ---------------------------------
-    # RECORD HISTORY
+    # RECORD HISTORY (PURE APPEND)
     # ---------------------------------
     state["history"]["ticks"].append(data["ticks"])
     state["history"]["Z"].append(metrics["Z"])
@@ -79,7 +85,7 @@ def render_dashboard(state, snapshot):
     state["history"]["Stability"].append(metrics["Stability"])
 
     # ---------------------------------
-    # METRIC EVOLUTION
+    # METRIC EVOLUTION PLOT
     # ---------------------------------
     st.subheader("Metric Evolution")
 
