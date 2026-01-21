@@ -19,7 +19,7 @@ def render_dashboard(state, snapshot):
     metrics = data["metrics"]
 
     # ---------------------------------
-    # INIT HISTORY + EVENT FLAG (ONCE)
+    # INIT HISTORY + EVENT FLAGS (ONCE)
     # ---------------------------------
     if "history" not in state:
         state["history"] = {
@@ -31,6 +31,9 @@ def render_dashboard(state, snapshot):
 
     if "record_history" not in state:
         state["record_history"] = False
+
+    if "last_recorded_tick" not in state:
+        state["last_recorded_tick"] = None
 
     # ---------------------------------
     # HEADER
@@ -51,11 +54,11 @@ def render_dashboard(state, snapshot):
 
     if c3.button("⏹ Close Frame"):
         close_frame(state)
-        state["record_history"] = True   # ✅ episode boundary
+        state["record_history"] = True   # episode boundary
 
     if c4.button("⏭ Tick"):
-        step_tick(state, snapshot)       # ✅ ONLY place tick is called
-        state["record_history"] = True   # ✅ real system event
+        step_tick(state, snapshot)       # ONLY place tick is called
+        state["record_history"] = True   # real system event
 
     # ---------------------------------
     # SNAPSHOT AFTER CONTROLS
@@ -89,13 +92,15 @@ def render_dashboard(state, snapshot):
     m3.metric("Stability", round(metrics["Stability"], 3))
 
     # ---------------------------------
-    # RECORD HISTORY (EVENT-BASED ONLY)
+    # RECORD HISTORY (EVENT + TICK SAFE)
     # ---------------------------------
-    if state["record_history"]:
+    if state["record_history"] and state["last_recorded_tick"] != data["ticks"]:
         state["history"]["ticks"].append(data["ticks"])
         state["history"]["Z"].append(metrics["Z"])
         state["history"]["Coherence"].append(metrics["Coherence"])
         state["history"]["Stability"].append(metrics["Stability"])
+
+        state["last_recorded_tick"] = data["ticks"]
         state["record_history"] = False
 
     # ---------------------------------
@@ -121,5 +126,18 @@ def render_dashboard(state, snapshot):
         state["history"]["ticks"],
         state["history"]["Stability"],
         label="Stability",
-        )
-       
+        color="green",
+    )
+
+    ax.set_xlabel("Tick")
+    ax.set_ylabel("Value")
+    ax.legend()
+    ax.grid(True)
+
+    st.pyplot(fig)
+
+    # ---------------------------------
+    # FINAL STATE
+    # ---------------------------------
+    st.subheader("Final State")
+    st.json(data)
