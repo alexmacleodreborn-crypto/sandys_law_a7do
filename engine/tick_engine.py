@@ -34,16 +34,19 @@ def step_tick(state: dict, snapshot_fn):
         and stability >= STABILITY_MIN
     )
 
+    # --------------------------------------------------
+    # IMPORTANT: positional constructor (NO keywords)
+    # --------------------------------------------------
     trace = MemoryTrace(
-        trace_id=state["ticks"],
-        features={
+        state["ticks"],                 # trace_id
+        {
             "Z": Z,
             "coherence": coherence,
             "stability": stability,
             "frame": snap["active_frame"].label if snap["active_frame"] else "none",
         },
-        weight=1.0,
-        tags=["stable"] if allowed else ["unstable"],
+        1.0,                             # weight
+        ["stable"] if allowed else ["unstable"],
     )
 
     if allowed:
