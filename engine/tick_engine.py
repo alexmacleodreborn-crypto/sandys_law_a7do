@@ -1,51 +1,38 @@
 # sandys_law_a7do/engine/tick_engine.py
 
 """
-Tick Engine — v1.1 (Perception Wired)
+Tick Engine — v1.2
 
-Implements:
-- Tick progression
-- Perceptual variation injection
-- Metric evolution (NO learning here)
-
-Learning remains episode-based (frame close).
+- Advances ticks
+- Injects embodied perception
+- NO memory writes
+- NO cognition
 """
 
-from sandys_law_a7do.mind.perception import perceive
+from sandys_law_a7do.integration.perception_loop import perceive_and_act
 from sandys_law_a7do.frames.fragment import Fragment
 
 
 def step_tick(state: dict, snapshot):
-    """
-    Single system tick.
-
-    Rules:
-    - Advances time
-    - Injects perceptual variation
-    - Does NOT write memory
-    - Does NOT close frames
-    """
-
     frames = state["frames"]
     active = frames.active
 
     # -----------------------------
-    # ADVANCE TICK
+    # ADVANCE TIME
     # -----------------------------
     state["ticks"] += 1
 
     # -----------------------------
-    # PERCEPTION → STRUCTURE
+    # EMBODIED PERCEPTION
     # -----------------------------
     if active:
-        percepts = perceive(state)
+        percepts = perceive_and_act(state)
 
         for p in percepts:
-            # Safety: perception must only add fragments
             if isinstance(p, Fragment):
                 frames.add_fragment(p)
 
     # -----------------------------
-    # SNAPSHOT ONLY (NO SIDE EFFECTS)
+    # OBSERVE ONLY
     # -----------------------------
     snapshot()
