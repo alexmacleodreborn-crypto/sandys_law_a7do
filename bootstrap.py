@@ -1,6 +1,6 @@
 # sandys_law_a7do/bootstrap.py
 """
-Bootstrap — v1.2 (FROZEN)
+Bootstrap — v1.3 (LOCKED)
 
 Implements:
 - Frame lifecycle
@@ -8,9 +8,8 @@ Implements:
 - Tick counter
 - OPTION A: Episode commit on frame close
 
-No rewards
-No time
-No semantics
+MemoryTrace signature (authoritative):
+MemoryTrace(tick, Z, coherence, stability, frame_signature, weight=1.0, tags=[...])
 """
 
 # =====================================================
@@ -117,6 +116,7 @@ def add_fragment(state: dict):
 def close_frame(state: dict):
     """
     OPTION A — EPISODE COMMIT ON FRAME CLOSE
+    (MATCHES REAL MemoryTrace)
     """
     frames: FrameStore = state["frames"]
     memory: StructuralMemory = state["memory"]
@@ -142,19 +142,14 @@ def close_frame(state: dict):
     stability = coherence * (1.0 - float(report.block_rate))
 
     # -----------------------------
-    # EPISODE MEMORY TRACE
-    # (MATCHES ACTUAL MemoryTrace)
+    # EPISODE MEMORY TRACE (POSITIONAL)
     # -----------------------------
     trace = MemoryTrace(
-        state["ticks"],   # trace_id
-        {
-            "frame": f"{frame.domain}:{frame.label}",
-            "Z": Z,
-            "coherence": coherence,
-            "stability": stability,
-            "fragments": fragment_count,
-            "unique_kinds": unique_actions,
-        },
+        state["ticks"],                  # tick
+        Z,                               # fragmentation
+        coherence,                       # coherence
+        stability,                       # stability
+        f"{frame.domain}:{frame.label}", # frame_signature
         tags=["episode", "stable"] if coherence >= 0.7 else ["episode", "unstable"],
     )
 
