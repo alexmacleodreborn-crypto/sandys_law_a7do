@@ -1,6 +1,6 @@
 # sandys_law_a7do/memory/similarity.py
 
-def similarity_score(a: dict, b: dict) -> float:
+def similarity_score (a: dict, b: dict) -> float:
     """
     Simple structural similarity between feature dicts.
     """
