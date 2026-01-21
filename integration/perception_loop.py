@@ -40,7 +40,7 @@ def perceive_and_act(state: dict) -> List[Fragment]:
     # PHASE 6.1 — ATTENTION (READ-ONLY)
     # --------------------------------------------------
 
-    attention_gain = 1.0  # neutral default
+    attention_gain = base_attention * preference_bias
 
     pref_store = state.get("preference_store")
     pref_engine = state.get("preference_engine")
