@@ -1,7 +1,5 @@
 # sandys_law_a7do/engine/tick_engine.py
 
-from sandys_law_a7do.mind.coherence import compute_coherence
-from sandys_law_a7do.mind.regulation import regulate
 from sandys_law_a7do.memory.trace import MemoryTrace
 
 # --------------------------------------------------
@@ -18,6 +16,7 @@ def step_tick(state: dict, snapshot):
 
     - Always records experience (trace_log)
     - Only consolidates memory if regulation allows
+    - MATCHES REAL MemoryTrace SIGNATURE (POSITIONAL)
     """
 
     # ---------------------------------
@@ -42,17 +41,24 @@ def step_tick(state: dict, snapshot):
     )
 
     # ---------------------------------
-    # CREATE MEMORY TRACE
-    # (MATCHES MemoryTrace SIGNATURE)
+    # FRAME SIGNATURE (SAFE)
+    # ---------------------------------
+    frame = data.get("active_frame")
+    frame_signature = (
+        f"{frame.domain}:{frame.label}"
+        if frame is not None
+        else "none"
+    )
+
+    # ---------------------------------
+    # CREATE MEMORY TRACE (POSITIONAL)
     # ---------------------------------
     trace = MemoryTrace(
-        state["ticks"],              # trace_id
-        {
-            "Z": Z,
-            "coherence": coherence,
-            "stability": stability,
-        },
-        weight=1.0,
+        state["ticks"],     # tick
+        Z,                  # fragmentation
+        coherence,           # coherence
+        stability,           # stability
+        frame_signature,     # frame signature
         tags=["stable"] if allowed else ["unstable"],
     )
 
