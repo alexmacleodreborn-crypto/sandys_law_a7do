@@ -19,7 +19,7 @@ def render_dashboard(state, snapshot):
     metrics = data["metrics"]
 
     # ---------------------------------
-    # INIT HISTORY + EVENT FLAGS (ONCE)
+    # INIT HISTORY + FLAGS (ONCE)
     # ---------------------------------
     if "history" not in state:
         state["history"] = {
@@ -48,9 +48,11 @@ def render_dashboard(state, snapshot):
 
     if c1.button("🆕 New Frame"):
         open_frame(state)
+        state["record_history"] = True
 
     if c2.button("➕ Add Fragment"):
         add_fragment(state)
+        state["record_history"] = True
 
     if c3.button("⏹ Close Frame"):
         close_frame(state)
@@ -58,7 +60,7 @@ def render_dashboard(state, snapshot):
 
     if c4.button("⏭ Tick"):
         step_tick(state, snapshot)       # ONLY place tick is called
-        state["record_history"] = True   # real system event
+        state["record_history"] = True
 
     # ---------------------------------
     # SNAPSHOT AFTER CONTROLS
@@ -91,22 +93,22 @@ def render_dashboard(state, snapshot):
     m2.metric("Coherence", round(metrics["Coherence"], 3))
     m3.metric("Stability", round(metrics["Stability"], 3))
 
-   # ---------------------------------
-# RECORD HISTORY (FRAME-AWARE + SAFE)
-# ---------------------------------
-should_record = (
-    data["active_frame"] is not None
-    or state["record_history"]
-)
+    # ---------------------------------
+    # RECORD HISTORY (FRAME-AWARE + SAFE)
+    # ---------------------------------
+    should_record = (
+        data["active_frame"] is not None
+        or state["record_history"]
+    )
 
-if should_record and state["last_recorded_tick"] != data["ticks"]:
-    state["history"]["ticks"].append(data["ticks"])
-    state["history"]["Z"].append(metrics["Z"])
-    state["history"]["Coherence"].append(metrics["Coherence"])
-    state["history"]["Stability"].append(metrics["Stability"])
+    if should_record and state["last_recorded_tick"] != data["ticks"]:
+        state["history"]["ticks"].append(data["ticks"])
+        state["history"]["Z"].append(metrics["Z"])
+        state["history"]["Coherence"].append(metrics["Coherence"])
+        state["history"]["Stability"].append(metrics["Stability"])
 
-    state["last_recorded_tick"] = data["ticks"]
-    state["record_history"] = False
+        state["last_recorded_tick"] = data["ticks"]
+        state["record_history"] = False
 
     # ---------------------------------
     # METRIC EVOLUTION PLOT
@@ -136,10 +138,35 @@ if should_record and state["last_recorded_tick"] != data["ticks"]:
 
     ax.set_xlabel("Tick")
     ax.set_ylabel("Value")
+    ax.set_ylim(0.0, 1.05)
     ax.legend()
     ax.grid(True)
 
     st.pyplot(fig)
+
+    # ---------------------------------
+    # MEMORY TIMELINE (READ-ONLY)
+    # ---------------------------------
+    st.subheader("Memory Timeline (Recent)")
+
+    memory = state.get("memory")
+
+    if memory and hasattr(memory, "traces") and memory.traces:
+        recent = memory.traces[-10:]
+
+        st.table([
+            {
+                "tick": t.tick,
+                "Z": round(t.Z, 3),
+                "coherence": round(t.coherence, 3),
+                "stability": round(t.stability, 3),
+                "frame": t.frame_signature,
+                "tags": ", ".join(t.tags),
+            }
+            for t in recent
+        ])
+    else:
+        st.caption("No memory traces recorded yet.")
 
     # ---------------------------------
     # FINAL STATE
