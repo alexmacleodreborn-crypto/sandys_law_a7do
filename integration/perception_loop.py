@@ -1,50 +1,46 @@
-# sandys_law_a7do/integration/perception_loop.py
 """
-Perception Loop — Phase 6.1 (IMMUTABLE SAFE)
+Perception Loop — Phase 6.2 (ATTENTION PERSISTENCE)
 
-Responsibilities:
-- Generate perceptual fragments (small structural diversity)
-- Carry READ-ONLY attention as structural payload
-- NO mutation of Fragment instances
-- NO action selection
+- Generates perceptual fragments
+- Attention is READ-ONLY bias
+- Attention has temporal inertia
+- NO mutation of fragments
 - NO memory writes
+- NO action selection
 """
 
-from __future__ import annotations
-
-import random
 from typing import List
 
 from sandys_law_a7do.frames.fragment import Fragment
 from sandys_law_a7do.accounting.attention import compute_attention_gain
 
 
-def _clip01(v: float) -> float:
-    v = float(v)
-    if v < 0.0:
-        return 0.0
-    if v > 1.0:
-        return 1.0
-    return v
+# ==================================================
+# CONFIG (LOCKED)
+# ==================================================
 
+ATTENTION_ALPHA = 0.85      # persistence strength
+ATTENTION_BASE = 1.0        # neutral baseline
+ATTENTION_MIN = 0.5
+ATTENTION_MAX = 1.5
+
+
+# ==================================================
+# MAIN LOOP
+# ==================================================
 
 def perceive_and_act(state: dict) -> List[Fragment]:
-    """
-    Phase 4–6 perception loop.
-
-    Generates fragments and embeds attention
-    as STRUCTURAL PAYLOAD (immutable-safe).
-
-    Attention is computed from preference context (if available),
-    else defaults to neutral base.
-    """
-
     fragments: List[Fragment] = []
 
-    # ---------------------------
+    # ---------------------------------------------
+    # Ensure attention state exists
+    # ---------------------------------------------
+    prev_attention = float(state.get("attention_level", ATTENTION_BASE))
+
+    # ---------------------------------------------
     # Default attention (neutral)
-    # ---------------------------
-    attention_gain = 0.50
+    # ---------------------------------------------
+    new_attention = ATTENTION_BASE
 
     pref_store = state.get("preference_store")
     pref_engine = state.get("preference_engine")
@@ -63,42 +59,40 @@ def perceive_and_act(state: dict) -> List[Fragment]:
                 notes=notes,
             )
 
-            pref_score = float(pref_store.get(context_key))  # [-1..+1]
-            attention_gain = compute_attention_gain(preference_score=pref_score)
+            pref_score = pref_store.get(context_key)
+
+            new_attention = compute_attention_gain(
+                preference_score=pref_score
+            )
 
         except Exception:
-            attention_gain = 0.50
+            # Perception must NEVER fail
+            new_attention = ATTENTION_BASE
 
-    # Defensive clip (never allow >1)
-    attention_gain = _clip01(attention_gain)
-
-    # --------------------------------------------------
-    # Controlled structural diversity (keeps Z moving)
-    # --------------------------------------------------
-    # Always a base "contact"
-    fragments.append(
-        Fragment(
-            kind="contact",
-            payload={"source": "demo", "attention": attention_gain},
-        )
+    # ---------------------------------------------
+    # Phase 6.2 — ATTENTION PERSISTENCE
+    # ---------------------------------------------
+    attention = (
+        ATTENTION_ALPHA * prev_attention
+        + (1.0 - ATTENTION_ALPHA) * new_attention
     )
 
-    # Occasional novelty (30%)
-    if random.random() < 0.30:
-        fragments.append(
-            Fragment(
-                kind="novel",
-                payload={"source": "demo", "attention": attention_gain},
-            )
-        )
+    # Clamp (hard safety)
+    attention = max(ATTENTION_MIN, min(ATTENTION_MAX, attention))
 
-    # Rare pressure (10%)
-    if random.random() < 0.10:
-        fragments.append(
-            Fragment(
-                kind="pressure",
-                payload={"source": "demo", "attention": attention_gain},
-            )
-        )
+    # Store for next tick
+    state["attention_level"] = attention
 
+    # ---------------------------------------------
+    # Emit fragment (IMMUTABLE)
+    # ---------------------------------------------
+    frag = Fragment(
+        kind="contact",
+        payload={
+            "source": "demo",
+            "attention": attention,
+        },
+    )
+
+    fragments.append(frag)
     return fragments
