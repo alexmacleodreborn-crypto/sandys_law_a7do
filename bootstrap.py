@@ -1,9 +1,12 @@
-# sandys_law_a7do/bootstrap.py
 """
-Bootstrap — v1.1
-Structural Regulation Core (v1.0) + Gated Memory (v1.1)
+Bootstrap — v1.2
+A7DO Core Wiring with Embodied Perception + Metric History
 
-FINAL aligned version
+This file is the SINGLE source of truth for:
+- System state
+- Tick evolution
+- Regulation
+- Memory gating
 """
 
 # =====================================================
@@ -18,7 +21,7 @@ from .mind.coherence import compute_coherence, CoherenceReport
 from .mind.regulation import regulate
 
 # =====================================================
-# MEMORY (v1.1)
+# MEMORY
 # =====================================================
 
 from .memory.trace import MemoryTrace
@@ -26,16 +29,20 @@ from .memory.structural_memory import StructuralMemory
 from .memory.crystallizer import crystallize
 from .memory.decay import decay_weight
 
+# =====================================================
+# PERCEPTION LOOP (Phase 4.1)
+# =====================================================
+
+from .integration.perception_loop import perceive_and_act
 
 # =====================================================
-# REGULATION THRESHOLDS (FROZEN v1.0)
+# REGULATION THRESHOLDS (FROZEN)
 # =====================================================
 
 Z_MAX = 0.6
 COHERENCE_MIN = 0.7
 STABILITY_MIN = 0.7
 MEMORY_PERSIST_TICKS = 3
-
 
 # =====================================================
 # SYSTEM BUILD
@@ -50,13 +57,23 @@ def build_system():
         "memory": memory,
         "ticks": 0,
         "stable_ticks": 0,
+
+        # ✅ Persistent metric history (UI + analysis)
+        "metric_history": {
+            "ticks": [],
+            "Z": [],
+            "Coherence": [],
+            "Stability": [],
+        },
+
+        # Optional visual markers
+        "crystallisation_ticks": [],
     }
 
     def snapshot():
         return system_snapshot(state)
 
     return None, snapshot, state
-
 
 # =====================================================
 # SNAPSHOT
@@ -78,6 +95,7 @@ def system_snapshot(state: dict) -> dict:
     # --------------------------------------------------
     # CoherenceReport (source of truth)
     # --------------------------------------------------
+
     report: CoherenceReport = compute_coherence(
         fragment_count=fragment_count,
         unique_actions=unique_actions,
@@ -87,13 +105,15 @@ def system_snapshot(state: dict) -> dict:
     # --------------------------------------------------
     # Sandy’s Law metric mapping
     # --------------------------------------------------
+
     Z = float(report.fragmentation)
     coherence = float(report.coherence)
     stability = coherence * (1.0 - float(report.block_rate))
 
     # --------------------------------------------------
-    # Regulation (v1.0 frozen)
+    # Regulation decision
     # --------------------------------------------------
+
     regulation = regulate(
         coherence=coherence,
         fragmentation=Z,
@@ -109,9 +129,8 @@ def system_snapshot(state: dict) -> dict:
         },
         "regulation": regulation,
         "active_frame": active,
-        "memory_count": memory.count(),   # ✅ FIXED
+        "memory_count": memory.count(),
     }
-
 
 # =====================================================
 # FRAME ACTIONS
@@ -125,24 +144,32 @@ def inject_demo_frame(state: dict):
     state["frames"].open(frame)
     return frame
 
-
 def add_fragment_by_kind(state: dict, kind: str):
     frag = Fragment(kind=kind)
     state["frames"].add_fragment(frag)
     return frag
 
-
 def close_frame(state: dict):
     return state["frames"].close()
 
-
 # =====================================================
-# TICK + MEMORY GATING (v1.1)
+# TICK + MEMORY GATING
 # =====================================================
 
 def tick_system(state: dict):
     state["ticks"] += 1
 
+    # ---------------------------------------------
+    # EMBODIED PERCEPTION (AUTO-FRAGMENTS)
+    # ---------------------------------------------
+    if state["frames"].active:
+        fragments = perceive_and_act(state)
+        for frag in fragments:
+            state["frames"].add_fragment(frag)
+
+    # ---------------------------------------------
+    # SNAPSHOT + METRICS
+    # ---------------------------------------------
     snap = system_snapshot(state)
     metrics = snap["metrics"]
 
@@ -150,22 +177,34 @@ def tick_system(state: dict):
     coherence = metrics["Coherence"]
     stability = metrics["Stability"]
 
+    # ---------------------------------------------
+    # RECORD METRIC HISTORY (THIS FIXES THE PLOT)
+    # ---------------------------------------------
+    hist = state["metric_history"]
+    hist["ticks"].append(state["ticks"])
+    hist["Z"].append(Z)
+    hist["Coherence"].append(coherence)
+    hist["Stability"].append(stability)
+
+    # ---------------------------------------------
+    # REGULATION GATE
+    # ---------------------------------------------
     allowed = (
         Z < Z_MAX
         and coherence >= COHERENCE_MIN
         and stability >= STABILITY_MIN
     )
 
+    # ---------------------------------------------
+    # MEMORY TRACE
+    # ---------------------------------------------
     trace = MemoryTrace(
-        tick=state["ticks"],
-        Z=Z,
-        coherence=coherence,
-        stability=stability,
-        frame_signature=(
-            snap["active_frame"].label
-            if snap["active_frame"]
-            else "none"
-        ),
+        trace_id=state["ticks"],
+        features={
+            "Z": Z,
+            "coherence": coherence,
+            "stability": stability,
+        },
     )
 
     if allowed:
@@ -174,6 +213,8 @@ def tick_system(state: dict):
 
         if state["stable_ticks"] >= MEMORY_PERSIST_TICKS:
             crystallize(state["memory"])
+            state["crystallisation_ticks"].append(state["ticks"])
+            state["stable_ticks"] = 0
     else:
         state["stable_ticks"] = 0
         decay_weight(state["memory"])
