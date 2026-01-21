@@ -1,4 +1,4 @@
-# sandys_law_a7do/gats/engine.py
+# sandys_law_a7do/gates/engine.py
 
 from sandys_law_a7do.gates.perception_gate import PerceptionGate
 from sandys_law_a7do.gates.consolidation_gate import ConsolidationGate
