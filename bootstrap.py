@@ -1,15 +1,24 @@
 # sandys_law_a7do/bootstrap.py
 """
-Bootstrap — v1.3 (LOCKED)
+Bootstrap — v1.4 (LOCKED)
 
 Implements:
 - Frame lifecycle
 - System snapshot
 - Tick counter
 - OPTION A: Episode commit on frame close
+- Controlled perceptual diversity (Phase 4.1)
 
-MemoryTrace signature (authoritative):
-MemoryTrace(tick, Z, coherence, stability, frame_signature, weight=1.0, tags=[...])
+MemoryTrace signature (AUTHORITATIVE):
+MemoryTrace(
+    tick,
+    Z,
+    coherence,
+    stability,
+    frame_signature,
+    weight=1.0,
+    tags=[...]
+)
 """
 
 # =====================================================
@@ -25,6 +34,9 @@ from sandys_law_a7do.mind.regulation import regulate
 
 from sandys_law_a7do.memory.trace import MemoryTrace
 from sandys_law_a7do.memory.structural_memory import StructuralMemory
+
+# 🔑 NEW (ALREADY EXISTS IN YOUR TREE)
+from sandys_law_a7do.integration.perception_loop import perceive_and_act
 
 
 # =====================================================
@@ -106,11 +118,22 @@ def open_frame(state: dict):
 
 
 def add_fragment(state: dict):
-    if not state["frames"].active:
+    """
+    Phase 4.1 — Controlled Perceptual Diversity
+
+    Introduces:
+    - Small structural variation
+    - No semantics
+    - No reward
+    - No goals
+    """
+    frame = state["frames"].active
+    if not frame:
         return
 
-    frag = Fragment(kind="demo")
-    state["frames"].add_fragment(frag)
+    fragments = perceive_and_act(state)
+    for frag in fragments:
+        state["frames"].add_fragment(frag)
 
 
 def close_frame(state: dict):
@@ -150,7 +173,8 @@ def close_frame(state: dict):
         coherence,                       # coherence
         stability,                       # stability
         f"{frame.domain}:{frame.label}", # frame_signature
-        tags=["episode", "stable"] if coherence >= 0.7 else ["episode", "unstable"],
+        1.0,                             # weight
+        ["episode", "stable"] if coherence >= 0.7 else ["episode", "unstable"],
     )
 
     memory.add_trace(trace)
@@ -162,7 +186,7 @@ def close_frame(state: dict):
 
 
 # =====================================================
-# TICK (UNCHANGED)
+# TICK (UNCHANGED / PURE)
 # =====================================================
 
 def tick_system(state: dict):
