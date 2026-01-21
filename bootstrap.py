@@ -1,6 +1,6 @@
 # sandys_law_a7do/bootstrap.py
 """
-Bootstrap — v1.4.1 (LOCKED)
+Bootstrap — v1.5 (LOCKED)
 
 Implements:
 - Frame lifecycle
@@ -9,6 +9,7 @@ Implements:
 - OPTION A: Episode commit on frame close
 - Controlled perceptual diversity (Phase 4.1)
 - Coherence ⇄ Perception coupling (Phase 4.2)
+- Structural load & stability divergence (Phase 5)
 
 MemoryTrace signature (AUTHORITATIVE):
 MemoryTrace(
@@ -37,7 +38,6 @@ from sandys_law_a7do.mind.perception import summarize_perception
 from sandys_law_a7do.memory.trace import MemoryTrace
 from sandys_law_a7do.memory.structural_memory import StructuralMemory
 
-# Phase 4.1 perceptual loop
 from sandys_law_a7do.integration.perception_loop import perceive_and_act
 
 
@@ -53,6 +53,9 @@ def build_system():
         "frames": frames,
         "memory": memory,
         "ticks": 0,
+
+        # Phase 5 — temporal structural pressure
+        "structural_load": 0.0,
     }
 
     def snapshot():
@@ -81,12 +84,16 @@ def system_snapshot(state: dict) -> dict:
         fragment_count=percept.fragment_count,
         unique_actions=percept.unique_actions,
         blocked_events=0,
-        percept_notes=percept.notes,   # 🔑 Phase 4.2 coupling
+        percept_notes=percept.notes,
     )
 
     Z = float(report.fragmentation)
     coherence = float(report.coherence)
-    stability = coherence * (1.0 - float(report.block_rate))
+
+    load = state.get("structural_load", 0.0)
+
+    # Phase 5 — stability diverges from coherence
+    stability = coherence * (1.0 - load)
 
     regulation = regulate(
         coherence=coherence,
@@ -122,12 +129,6 @@ def open_frame(state: dict):
 def add_fragment(state: dict):
     """
     Phase 4.1 — Controlled Perceptual Diversity
-
-    Introduces:
-    - Small structural variation
-    - No semantics
-    - No reward
-    - No goals
     """
     frame = state["frames"].active
     if not frame:
@@ -141,7 +142,6 @@ def add_fragment(state: dict):
 def close_frame(state: dict):
     """
     OPTION A — EPISODE COMMIT ON FRAME CLOSE
-    (MATCHES REAL MemoryTrace)
     """
     frames: FrameStore = state["frames"]
     memory: StructuralMemory = state["memory"]
@@ -150,9 +150,6 @@ def close_frame(state: dict):
     if not frame:
         return
 
-    # -----------------------------
-    # FINAL FRAME SNAPSHOT
-    # -----------------------------
     fragments = [{"action": f.kind} for f in frame.fragments]
     percept = summarize_perception(fragments)
 
@@ -165,32 +162,49 @@ def close_frame(state: dict):
 
     Z = float(report.fragmentation)
     coherence = float(report.coherence)
-    stability = coherence * (1.0 - float(report.block_rate))
 
-    # -----------------------------
-    # EPISODE MEMORY TRACE (POSITIONAL)
-    # -----------------------------
+    load = state.get("structural_load", 0.0)
+    stability = coherence * (1.0 - load)
+
     trace = MemoryTrace(
-        state["ticks"],                  # tick
-        Z,                               # fragmentation
-        coherence,                       # coherence
-        stability,                       # stability
-        f"{frame.domain}:{frame.label}", # frame_signature
-        1.0,                             # weight
-        ["episode", "stable"] if coherence >= 0.7 else ["episode", "unstable"],
+        state["ticks"],
+        Z,
+        coherence,
+        stability,
+        f"{frame.domain}:{frame.label}",
+        1.0,
+        ["episode", "stable"] if stability >= 0.7 else ["episode", "unstable"],
     )
 
     memory.add_trace(trace)
 
-    # -----------------------------
-    # CLOSE FRAME (RESET IS CORRECT)
-    # -----------------------------
+    # Resolution releases pressure
+    state["structural_load"] *= 0.6
+
     frames.close()
 
 
 # =====================================================
-# TICK (UNCHANGED / PURE)
+# TICK — Phase 5 Structural Load
 # =====================================================
 
 def tick_system(state: dict):
+    """
+    Phase 5 — Temporal structural pressure
+
+    - Load increases when a frame remains open
+    - Load decays when no frame is active
+    """
     state["ticks"] += 1
+
+    frames = state["frames"]
+    load = state.get("structural_load", 0.0)
+
+    if frames.active:
+        # Unresolved persistence accumulates cost
+        load += 0.05
+    else:
+        # Rest releases pressure
+        load *= 0.6
+
+    state["structural_load"] = max(0.0, min(1.0, load))
