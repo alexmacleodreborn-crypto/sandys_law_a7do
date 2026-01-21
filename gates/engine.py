@@ -1,8 +1,9 @@
-# sandys_law_a7do/gates/rules.py
+# sandys_law_a7do/gates/engine.py
 
 from dataclasses import dataclass
-from typing import Callable, Dict
+from typing import Dict, List
 
+from sandys_law_a7do.gates.rules import GateRule, GateDecision, default_gate_rules
 
 # =====================================================
 # GATE DECISION
