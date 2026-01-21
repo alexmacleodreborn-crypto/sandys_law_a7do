@@ -1,71 +1,90 @@
-# sandys_law_a7do/gates/engine.py
 """
-Gate Engine — Phase 7.3 (READ-ONLY)
+Gate Engine — Phase 7.3 (STRUCTURAL, READ-ONLY)
 
-Evaluates cognitive gates without enforcing them.
-No mutation. No routing. No blocking.
+Responsibilities:
+- Evaluate gate rules against system snapshot
+- Maintain internal gate scores
+- Expose READ-ONLY snapshots for dashboards / downstream use
+
+NO:
+- control
+- blocking
+- routing
+- action selection
 """
 
-from dataclasses import dataclass
-from typing import Dict, List
+from dataclasses import dataclass, field
+from typing import Dict, Any, List
 
-from sandys_law_a7do.gates.base_gate import BaseGate
-from sandys_law_a7do.gates.perception_gate import PerceptionGate
-from sandys_law_a7do.gates.consolidation_gate import ConsolidationGate
-from sandys_law_a7do.gates.education_gate import EducationGate
-from sandys_law_a7do.gates.role_gate import RoleGate
+from sandys_law_a7do.gates.rules import GateRule, default_gate_rules
 
 
 # --------------------------------------------------
-# DATA STRUCTURES
+# Gate State (internal, mutable)
 # --------------------------------------------------
 
-@dataclass(frozen=True)
+@dataclass
 class GateState:
-    name: str
-    score: float
-    open: bool
-    reason: str
+    """
+    Internal gate state (scores only).
+    """
+    scores: Dict[str, float] = field(default_factory=dict)
 
+
+# --------------------------------------------------
+# Gate Snapshot (external, immutable)
+# --------------------------------------------------
 
 @dataclass(frozen=True)
 class GateSnapshot:
-    states: Dict[str, GateState]
+    """
+    Read-only gate snapshot.
+    """
+    scores: Dict[str, float]
 
 
 # --------------------------------------------------
-# ENGINE
+# Gate Engine
 # --------------------------------------------------
 
 class GateEngine:
     """
-    Evaluates all gates using current system state.
+    Evaluates structural gates.
 
-    READ-ONLY:
-    - Does not block
-    - Does not mutate
-    - Does not route
+    IMPORTANT:
+    - Gates do NOT block
+    - Gates do NOT select
+    - Gates only SCORE
     """
 
-    def __init__(self) -> None:
-        self.gates: List[BaseGate] = [
-            PerceptionGate(),
-            ConsolidationGate(),
-            EducationGate(),
-            RoleGate(),
-        ]
+    def __init__(self, rules: List[GateRule] | None = None):
+        self.rules: List[GateRule] = rules or list(default_gate_rules)
+        self.state = GateState()
 
-    def evaluate(self, state: dict) -> GateSnapshot:
-        states: Dict[str, GateState] = {}
+    # ----------------------------------------------
+    # Evaluate gates against system snapshot
+    # ----------------------------------------------
 
-        for gate in self.gates:
-            result = gate.evaluate(state)
+    def evaluate(self, system_snapshot: Dict[str, Any]) -> None:
+        """
+        Update internal gate scores from snapshot.
+        """
+        for rule in self.rules:
+            try:
+                score = float(rule.evaluator(system_snapshot))
+            except Exception:
+                score = 0.0
 
-            states[gate.name] = GateState(
-                name=gate.name,
-                score=float(result.score),
-                open=bool(result.open),
-                reason=str(result.reason),
-            )
+            # Clamp to [0, 1]
+            score = max(0.0, min(1.0, score))
+            self.state.scores[rule.name] = score
 
-        return GateSnapshot(states=states)
+    # ----------------------------------------------
+    # REQUIRED METHOD (THIS FIXES YOUR ERROR)
+    # ----------------------------------------------
+
+    def snapshot(self) -> GateSnapshot:
+        """
+        Return a read-only snapshot of gate scores.
+        """
+        return GateSnapshot(scores=dict(self.state.scores))
