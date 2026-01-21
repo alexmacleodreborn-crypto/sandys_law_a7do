@@ -1,64 +1,68 @@
 # sandys_law_a7do/engine/tick_engine.py
 
+from sandys_law_a7do.mind.coherence import compute_coherence
+from sandys_law_a7do.mind.regulation import regulate
 from sandys_law_a7do.memory.trace import MemoryTrace
-from sandys_law_a7do.memory.crystallizer import crystallize
-from sandys_law_a7do.memory.decay import decay_weight
 
 # --------------------------------------------------
-# Frozen regulation thresholds
+# REGULATION THRESHOLDS (FROZEN)
 # --------------------------------------------------
 Z_MAX = 0.6
 COHERENCE_MIN = 0.7
 STABILITY_MIN = 0.7
-MEMORY_PERSIST_TICKS = 3
 
 
-def step_tick(state: dict, snapshot_fn):
+def step_tick(state: dict, snapshot):
     """
-    Single authoritative tick step.
-    Matches the REAL MemoryTrace schema.
+    Advance system by one tick.
+
+    - Always records experience (trace_log)
+    - Only consolidates memory if regulation allows
     """
 
+    # ---------------------------------
+    # ADVANCE TIME
+    # ---------------------------------
     state["ticks"] += 1
 
-    snap = snapshot_fn()
-    metrics = snap["metrics"]
+    data = snapshot()
+    metrics = data["metrics"]
 
     Z = metrics["Z"]
     coherence = metrics["Coherence"]
     stability = metrics["Stability"]
 
-    frame_signature = (
-        snap["active_frame"].label
-        if snap["active_frame"] is not None
-        else "none"
-    )
-
+    # ---------------------------------
+    # REGULATION DECISION
+    # ---------------------------------
     allowed = (
         Z < Z_MAX
         and coherence >= COHERENCE_MIN
         and stability >= STABILITY_MIN
     )
 
-    # --------------------------------------------------
-    # MEMORY TRACE — MATCHES ACTUAL CLASS
-    # --------------------------------------------------
+    # ---------------------------------
+    # CREATE MEMORY TRACE
+    # (MATCHES MemoryTrace SIGNATURE)
+    # ---------------------------------
     trace = MemoryTrace(
-        state["ticks"],      # tick
-        Z,                   # fragmentation
-        coherence,           # coherence
-        stability,           # stability
-        frame_signature,     # REQUIRED
+        state["ticks"],              # trace_id
+        {
+            "Z": Z,
+            "coherence": coherence,
+            "stability": stability,
+        },
+        weight=1.0,
+        tags=["stable"] if allowed else ["unstable"],
     )
 
+    # ---------------------------------
+    # ALWAYS RECORD EXPERIENCE
+    # ---------------------------------
+    state["memory"].trace_log.append(trace)
+
+    # ---------------------------------
+    # ONLY CONSOLIDATE IF ALLOWED
+    # ---------------------------------
     if allowed:
-        state["stable_ticks"] += 1
         state["memory"].add_trace(trace)
-
-        if state["stable_ticks"] >= MEMORY_PERSIST_TICKS:
-            crystallize(state["memory"])
-    else:
-        state["stable_ticks"] = 0
-        decay_weight(state["memory"])
-
-    return trace
