@@ -56,9 +56,12 @@ def build_system():
     frames = FrameStore()
     memory = StructuralMemory()
 
-    # Phase 6 — preference (in-memory)
+    # Phase 6 — preference (persistent during runtime only)
     pref_store = PreferenceStore()
-    pref_engine = PreferenceEngine(store=pref_store, cfg=PreferenceConfig())
+    pref_engine = PreferenceEngine(
+        store=pref_store,
+        cfg=PreferenceConfig(),
+    )
 
     state = {
         "frames": frames,
@@ -90,12 +93,18 @@ def system_snapshot(state: dict) -> dict:
 
     active = frames.active
 
+    # ---------------------------------
+    # PERCEPTION
+    # ---------------------------------
     if active:
         fragments = [{"action": f.kind} for f in active.fragments]
         percept = summarize_perception(fragments)
     else:
         percept = summarize_perception([])
 
+    # ---------------------------------
+    # COHERENCE
+    # ---------------------------------
     report = compute_coherence(
         fragment_count=percept.fragment_count,
         unique_actions=percept.unique_actions,
@@ -106,16 +115,24 @@ def system_snapshot(state: dict) -> dict:
     Z = float(report.fragmentation)
     coherence = float(report.coherence)
 
+    # ---------------------------------
+    # STRUCTURAL LOAD → STABILITY
+    # ---------------------------------
     load = float(state.get("structural_load", 0.0))
     stability = coherence * (1.0 - load)
 
+    # ---------------------------------
+    # REGULATION (READ-ONLY)
+    # ---------------------------------
     regulation = regulate(
         coherence=coherence,
         fragmentation=Z,
         block_rate=report.block_rate,
     )
 
-    # Phase 6 — expose top preferences (read-only)
+    # ---------------------------------
+    # PREFERENCE VISIBILITY (READ-ONLY)
+    # ---------------------------------
     pref_store: PreferenceStore = state["preference_store"]
     top_contexts = pref_store.top(10)
 
@@ -130,10 +147,11 @@ def system_snapshot(state: dict) -> dict:
         "regulation": regulation,
         "active_frame": active,
         "memory_count": memory.count(),
-
-        # Phase 6: preference visibility
-        "preference_top": [{"context": k, "score": v} for (k, v) in top_contexts],
-        "last_preference_update": state.get("last_preference_update"),
+        "preference_top": [
+            {"context": k, "score": v}
+            for (k, v) in top_contexts
+        ],
+        "last_preference_update": state["last_preference_update"],
     }
 
 
@@ -166,9 +184,9 @@ def close_frame(state: dict):
     """
     OPTION A — EPISODE COMMIT ON FRAME CLOSE
 
-    Phase 6 addition:
-    - Update PreferenceEngine with structural context derived from percept + metrics
-    - Store only a bias score for context keys (no actions, no reward)
+    Phase 6:
+    - Commit memory
+    - Update preference bias (read-only, no action)
     """
     frames: FrameStore = state["frames"]
     memory: StructuralMemory = state["memory"]
@@ -177,7 +195,9 @@ def close_frame(state: dict):
     if not frame:
         return
 
-    # ---- percept summary of the episode ----
+    # ---------------------------------
+    # FINAL PERCEPT
+    # ---------------------------------
     fragments = [{"action": f.kind} for f in frame.fragments]
     percept = summarize_perception(fragments)
 
@@ -194,7 +214,9 @@ def close_frame(state: dict):
     load = float(state.get("structural_load", 0.0))
     stability = coherence * (1.0 - load)
 
-    # ---- Memory trace (authoritative signature) ----
+    # ---------------------------------
+    # MEMORY TRACE (AUTHORITATIVE)
+    # ---------------------------------
     trace = MemoryTrace(
         state["ticks"],
         Z,
@@ -206,10 +228,11 @@ def close_frame(state: dict):
     )
     memory.add_trace(trace)
 
-    # ---- Phase 6: Preference update (READ-ONLY BIAS) ----
+    # ---------------------------------
+    # PHASE 6 — PREFERENCE UPDATE
+    # ---------------------------------
     pref_engine: PreferenceEngine = state["preference_engine"]
 
-    # structural context key (no semantics)
     context_key = pref_engine.context_key_from_accounting(
         coherence=coherence,
         fragmentation=Z,
@@ -217,14 +240,12 @@ def close_frame(state: dict):
         notes=percept.notes,
     )
 
-    # prediction_error not implemented yet -> neutral placeholder
-    # (keeps preference bounded; do NOT invent reward here)
     update = pref_engine.update(
         context_key=context_key,
         coherence=coherence,
         fragmentation=Z,
         block_rate=float(report.block_rate),
-        prediction_error_l1=None,
+        prediction_error_l1=None,  # neutral placeholder (correct)
     )
 
     state["last_preference_update"] = {
@@ -236,21 +257,23 @@ def close_frame(state: dict):
         "reason": update.reason,
     }
 
-    # ---- Resolution releases pressure ----
+    # ---------------------------------
+    # RESOLUTION RELIEVES LOAD
+    # ---------------------------------
     state["structural_load"] *= 0.6
 
     frames.close()
 
 
 # =====================================================
-# TICK — Phase 5 Structural Load
+# TICK — PHASE 5 STRUCTURAL LOAD
 # =====================================================
 
 def tick_system(state: dict):
     """
     Phase 5 — Temporal structural pressure
 
-    - Load increases when a frame remains open
+    - Load increases while a frame is open
     - Load decays when no frame is active
     """
     state["ticks"] += 1
