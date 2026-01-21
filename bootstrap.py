@@ -1,42 +1,21 @@
+# sandys_law_a7do/bootstrap.py
 """
-Bootstrap — v1.2 (STABLE)
-
-Responsibilities:
-- Owns all system state
-- Enforces structural order (Frame → Fragment → Tick)
-- No UI logic
+A7DO Bootstrap — FINAL STABLE CORE
 """
 
-# =====================================================
-# CORE STRUCTURES
-# =====================================================
+from sandys_law_a7do.frames.store import FrameStore
+from sandys_law_a7do.frames.frame import Frame
+from sandys_law_a7do.frames.fragment import Fragment
 
-from .frames.store import FrameStore
-from .frames.frame import Frame
-from .frames.fragment import Fragment
+from sandys_law_a7do.mind.coherence import compute_coherence
+from sandys_law_a7do.mind.regulation import regulate
 
-from .mind.coherence import compute_coherence
-from .mind.regulation import regulate
-
-from .memory.trace import MemoryTrace
-from .memory.structural_memory import StructuralMemory
-from .memory.crystallizer import crystallize
-from .memory.decay import decay_weight
+from sandys_law_a7do.memory.structural_memory import StructuralMemory
 
 
-# =====================================================
-# FROZEN REGULATION THRESHOLDS
-# =====================================================
-
-Z_MAX = 0.6
-COHERENCE_MIN = 0.7
-STABILITY_MIN = 0.7
-MEMORY_PERSIST_TICKS = 3
-
-
-# =====================================================
+# --------------------------------------------------
 # SYSTEM BUILD
-# =====================================================
+# --------------------------------------------------
 
 def build_system():
     frames = FrameStore()
@@ -47,13 +26,6 @@ def build_system():
         "memory": memory,
         "ticks": 0,
         "stable_ticks": 0,
-        "metric_history": {
-            "ticks": [],
-            "Z": [],
-            "Coherence": [],
-            "Stability": [],
-        },
-        "crystallisation_ticks": [],
     }
 
     def snapshot():
@@ -62,13 +34,13 @@ def build_system():
     return snapshot, state
 
 
-# =====================================================
-# SNAPSHOT (PURE READ)
-# =====================================================
+# --------------------------------------------------
+# SNAPSHOT (PURE)
+# --------------------------------------------------
 
 def system_snapshot(state: dict) -> dict:
-    frames = state["frames"]
-    memory = state["memory"]
+    frames: FrameStore = state["frames"]
+    memory: StructuralMemory = state["memory"]
 
     active = frames.active
 
@@ -87,7 +59,7 @@ def system_snapshot(state: dict) -> dict:
 
     Z = float(report.fragmentation)
     coherence = float(report.coherence)
-    stability = coherence * (1.0 - report.block_rate)
+    stability = coherence * (1.0 - float(report.block_rate))
 
     regulation = regulate(
         coherence=coherence,
@@ -108,79 +80,21 @@ def system_snapshot(state: dict) -> dict:
     }
 
 
-# =====================================================
+# --------------------------------------------------
 # FRAME ACTIONS
-# =====================================================
+# --------------------------------------------------
 
-def inject_demo_frame(state: dict):
-    if state["frames"].active is not None:
-        return None
-
-    frame = Frame(domain="demo", label="ui")
-    state["frames"].open(frame)
-    return frame
+def open_frame(state: dict):
+    if state["frames"].active:
+        return
+    state["frames"].open(Frame(domain="demo", label="ui"))
 
 
-def add_fragment_by_kind(state: dict, kind: str):
-    frames = state["frames"]
-
-    if frames.active is None:
-        return None  # ← critical safety fix
-
-    frag = Fragment(kind=kind)
-    frames.add_fragment(frag)
-    return frag
+def add_fragment(state: dict, kind="demo"):
+    if not state["frames"].active:
+        return
+    state["frames"].add_fragment(Fragment(kind=kind))
 
 
 def close_frame(state: dict):
-    return state["frames"].close()
-
-
-# =====================================================
-# TICK + MEMORY GATING (LOCKED)
-# =====================================================
-
-def tick_system(state: dict):
-    state["ticks"] += 1
-
-    snap = system_snapshot(state)
-    metrics = snap["metrics"]
-
-    Z = metrics["Z"]
-    coherence = metrics["Coherence"]
-    stability = metrics["Stability"]
-
-    allowed = (
-        Z < Z_MAX
-        and coherence >= COHERENCE_MIN
-        and stability >= STABILITY_MIN
-    )
-
-    # --------------------------------------------------
-    # MEMORY TRACE (STRUCTURALLY CORRECT)
-    # --------------------------------------------------
-    trace = MemoryTrace(
-        trace_id=state["ticks"],
-        features={
-            "Z": Z,
-            "coherence": coherence,
-            "stability": stability,
-            "frame": (
-                snap["active_frame"].label
-                if snap["active_frame"]
-                else "none"
-            ),
-        },
-        weight=1.0,
-        tags=["stable"] if allowed else ["unstable"],
-    )
-
-    if allowed:
-        state["stable_ticks"] += 1
-        state["memory"].add_trace(trace)
-
-        if state["stable_ticks"] >= MEMORY_PERSIST_TICKS:
-            crystallize(state["memory"])
-    else:
-        state["stable_ticks"] = 0
-        decay_weight(state["memory"])
+    state["frames"].close()
