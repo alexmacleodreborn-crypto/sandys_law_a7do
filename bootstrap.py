@@ -14,6 +14,7 @@ This file is AUTHORITATIVE.
 
 from __future__ import annotations
 from typing import Any, Callable, Dict, Tuple
+import inspect
 
 from sandys_law_a7do.frames.store import FrameStore
 from sandys_law_a7do.frames.frame import Frame
@@ -40,7 +41,6 @@ def _get(obj: Any, key: str, default: Any = None) -> Any:
 def _normalize_gate(gs: Any) -> Dict[str, Any]:
     """
     Normalize a gate snapshot into dashboard-safe dict.
-    Works for dict-based OR object-based gate engines.
     """
     result = _get(gs, "result", gs)
 
@@ -72,7 +72,7 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "frames": FrameStore(),
         "memory": StructuralMemory(),
 
-        # structural channels (written by tick engine)
+        # structural channels
         "last_coherence": 0.0,
         "last_fragmentation": 0.0,
         "last_block_rate": 0.0,
@@ -135,10 +135,6 @@ def system_snapshot(state: dict) -> dict:
 # ============================================================
 
 def open_frame(state: dict, *, domain: str = "demo", label: str = "ui") -> None:
-    """
-    Doorman behaviour:
-    - If no frame is active, open immediately.
-    """
     frames: FrameStore = state["frames"]
     if frames.active:
         return
@@ -160,10 +156,6 @@ def add_fragment(
 def close_frame(state: dict) -> None:
     """
     OPTION A — Episode boundary
-
-    This is where:
-    - Memory is committed
-    - Gates are evaluated
     """
 
     frames: FrameStore = state["frames"]
@@ -175,7 +167,7 @@ def close_frame(state: dict) -> None:
         return
 
     # -----------------------------
-    # FINAL STRUCTURAL READOUT
+    # STRUCTURAL READOUT
     # -----------------------------
     Z = float(state.get("last_fragmentation", 0.0))
     coherence = float(state.get("last_coherence", 0.0))
@@ -189,27 +181,41 @@ def close_frame(state: dict) -> None:
     # -----------------------------
     memory.add_trace(
         MemoryTrace(
-            state["ticks"],
-            Z,
-            coherence,
-            stability,
-            f"{frame.domain}:{frame.label}",
-            1.0,
-            ["episode", "stable"] if stability >= 0.7 else ["episode", "unstable"],
+            tick=state["ticks"],
+            fragmentation=Z,
+            coherence=coherence,
+            stability=stability,
+            context=f"{frame.domain}:{frame.label}",
+            weight=1.0,
+            tags=["episode", "stable"] if stability >= 0.7 else ["episode", "unstable"],
         )
     )
 
     # -----------------------------
-    # 🔑 GATE EVALUATION (PHASE 7.4)
+    # 🔑 SAFE GATE EVALUATION
     # -----------------------------
     if gate_engine is not None:
-        gate_engine.evaluate(
-            coherence=coherence,
-            fragmentation=Z,
-            load=load,
-            prediction_error=prediction_error,
-            tick=state["ticks"],
-        )
+        try:
+            sig = inspect.signature(gate_engine.evaluate)
+            kwargs = {}
+
+            for name in sig.parameters:
+                if name == "coherence":
+                    kwargs[name] = coherence
+                elif name == "fragmentation":
+                    kwargs[name] = Z
+                elif name == "load":
+                    kwargs[name] = load
+                elif name == "prediction_error":
+                    kwargs[name] = prediction_error
+                elif name == "tick":
+                    kwargs[name] = state["ticks"]
+
+            gate_engine.evaluate(**kwargs)
+
+        except Exception:
+            # Gates must NEVER crash the system
+            pass
 
     # -----------------------------
     # RELEASE PRESSURE
@@ -226,7 +232,6 @@ def close_frame(state: dict) -> None:
 def tick_system(state: dict) -> None:
     """
     Tick advances time and structural pressure.
-    Structural metrics are written elsewhere (engine).
     """
     state["ticks"] += 1
 
