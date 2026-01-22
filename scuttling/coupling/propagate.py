@@ -1,41 +1,79 @@
-# sandys_law_a7do/scuttling/coupling/propagate.py
+from __future__ import annotations
 
-from typing import Dict
-from .region import BodyRegion
+from typing import Set
+
 from .graph import CouplingGraph
+from .region import CoupledRegion
 
 
-def propagate_once(
-    *,
-    regions: Dict[str, BodyRegion],
-    graph: CouplingGraph,
-) -> None:
+class CouplingPropagator:
     """
-    Single propagation step.
+    Handles local-to-regional propagation of load, pain, or unresolved signals.
 
-    - Load flows upward (decaying)
-    - Stability diffuses (damped)
+    This is a reflex-layer mechanism:
+    - propagation is automatic
+    - propagation is bounded
+    - propagation stops once resolution occurs
+
+    No cognition, memory, or intent is involved.
     """
 
-    load_updates: Dict[str, float] = {}
-    stability_updates: Dict[str, float] = {}
+    def __init__(self, graph: CouplingGraph):
+        self.graph = graph
 
-    for (src, dst), edge in graph.edges.items():
-        a = regions.get(src)
-        b = regions.get(dst)
-        if not a or not b:
-            continue
+    # -------------------------------------------------
+    # Core propagation
+    # -------------------------------------------------
 
-        load_updates[dst] = load_updates.get(dst, 0.0) + (
-            a.load * edge.strength
-        )
+    def propagate_from(self, source: CoupledRegion) -> None:
+        """
+        Propagate unresolved load outward until resolved or exhausted.
 
-        stability_updates[dst] = stability_updates.get(dst, 0.0) + (
-            a.stability * edge.damping
-        )
+        Rules:
+        - propagate only if region cannot resolve locally
+        - propagate to immediate neighbors
+        - never revisit regions in same cycle
+        """
 
-    for name, delta in load_updates.items():
-        regions[name].load = min(1.0, regions[name].load + delta)
+        if source.can_resolve_locally():
+            return
 
-    for name, delta in stability_updates.items():
-        regions[name].stability = min(1.0, regions[name].stability + delta)
+        visited: Set[str] = set()
+        self._propagate_recursive(source, visited)
+
+    def _propagate_recursive(
+        self,
+        region: CoupledRegion,
+        visited: Set[str],
+    ) -> None:
+        if region.name in visited:
+            return
+
+        visited.add(region.name)
+
+        # Attempt local resolution again before escalation
+        if region.attempt_resolution():
+            return
+
+        # Propagate unresolved signal to neighbors
+        for neighbor in self.graph.neighbors(region.name):
+            neighbor.receive_propagated_signal(
+                load=region.unresolved_load,
+                pain=region.pain_signal,
+            )
+
+            if not neighbor.can_resolve_locally():
+                self._propagate_recursive(neighbor, visited)
+
+    # -------------------------------------------------
+    # Sweep utilities
+    # -------------------------------------------------
+
+    def propagate_all(self) -> None:
+        """
+        Run propagation for all unresolved regions.
+
+        This allows full-body reflex resolution without ordering assumptions.
+        """
+        for region in self.graph.unresolved_regions():
+            self.propagate_from(region)
