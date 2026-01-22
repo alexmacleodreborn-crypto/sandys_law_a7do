@@ -1,6 +1,3 @@
-# sandys_law_a7do/embodiment/__init__.py
-
-from .boundaries import BoundaryState, BoundarySignal
-from .ownership import OwnershipMap
-from .thermal_pain import ThermalPainSignal
+from .entry import LedgerEntry
 from .ledger import EmbodimentLedger
+from .invariants import EmbodimentKind
