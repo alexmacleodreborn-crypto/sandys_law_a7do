@@ -12,12 +12,12 @@ This is a physical substrate for:
 - embodiment invariants
 """
 
-from .region import BodyRegion
+from .region import CoupledRegion
 from .graph import CouplingGraph, CouplingEdge
 from .propagate import propagate_once
 
 __all__ = [
-    "BodyRegion",
+    "CoupledRegion",
     "CouplingGraph",
     "CouplingEdge",
     "propagate_once",
