@@ -3,12 +3,11 @@ Bootstrap — Phase 7.4 FINAL (LOCKED)
 
 Responsibilities:
 - Frame lifecycle
-- Tick tracking
-- Memory commit on frame close
-- Gate evaluation at episode boundary
-- Dashboard-safe snapshots
-- Prebirth womb environment (READ-ONLY)
-- Birth evaluation (STRUCTURAL ONLY)
+- Tick tracking (authoritative)
+- Prebirth womb physics
+- Scuttling (local growth)
+- Birth evaluation (structural only)
+- Read-only snapshots for dashboard
 """
 
 from __future__ import annotations
@@ -20,39 +19,30 @@ from sandys_law_a7do.frames.fragment import Fragment
 
 from sandys_law_a7do.memory.structural_memory import StructuralMemory
 from sandys_law_a7do.memory.trace import MemoryTrace
-
 from sandys_law_a7do.gates.engine import GateEngine
 
-# Embodiment (read-only)
+# Embodiment (INERT until birth)
 from embodiment.ledger.ledger import EmbodimentLedger
 from embodiment.bridge.accountant import summarize_embodiment
 
-# Prebirth + Birth
+# Genesis
 from genesis.womb.physics import WombPhysicsEngine
 from genesis.birth import BirthEvaluator
 
+# Scuttling (LOCAL growth)
+from sandys_law_a7do.scuttling.engine import ScuttlingEngine
+
 
 # ============================================================
-# SAFE ACCESS HELPERS
+# SAFE ACCESS
 # ============================================================
 
-def _get(obj: Any, key: str, default: Any = None) -> Any:
+def _get(obj: Any, key: str, default=None):
     if obj is None:
         return default
     if isinstance(obj, dict):
         return obj.get(key, default)
     return getattr(obj, key, default)
-
-
-def _normalize_gate(gs: Any) -> Dict[str, Any]:
-    result = _get(gs, "result", gs)
-    return {
-        "state": _get(result, "state"),
-        "open": _get(result, "open"),
-        "score": _get(result, "score"),
-        "reason": _get(result, "reason"),
-        "last_tick": _get(gs, "last_tick"),
-    }
 
 
 # ============================================================
@@ -64,19 +54,22 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         # time
         "ticks": 0,
 
-        # core systems
+        # core runtime
         "frames": FrameStore(),
         "memory": StructuralMemory(),
         "gate_engine": GateEngine(),
 
-        # embodiment substrate (NO BEHAVIOUR)
+        # embodiment (EMPTY until birth)
         "embodiment_ledger": EmbodimentLedger(),
 
-        # prebirth womb (NO AGENCY)
+        # genesis
         "womb_engine": WombPhysicsEngine(),
         "last_womb_state": None,
 
-        # birth (STRUCTURAL ONLY)
+        # scuttling (ACTIVE prebirth)
+        "scuttling_engine": ScuttlingEngine(),
+
+        # birth
         "birth_evaluator": BirthEvaluator(),
         "birth_state": None,
 
@@ -100,7 +93,6 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
 def system_snapshot(state: dict) -> dict:
     frames: FrameStore = state["frames"]
     memory: StructuralMemory = state["memory"]
-    gate_engine: GateEngine | None = state.get("gate_engine")
 
     Z = float(state.get("last_fragmentation", 0.0))
     coherence = float(state.get("last_coherence", 0.0))
@@ -114,19 +106,25 @@ def system_snapshot(state: dict) -> dict:
         "Load": load,
     }
 
-    # Gates
-    gate_view: Dict[str, Dict[str, Any]] = {}
-    if gate_engine:
-        snap = gate_engine.snapshot()
-        for name, gs in (_get(snap, "gates", {}) or {}).items():
-            gate_view[str(name)] = _normalize_gate(gs)
+    # -----------------------------
+    # Embodiment (empty prebirth)
+    # -----------------------------
+    embodiment_view = summarize_embodiment(
+        state["embodiment_ledger"]
+    )
 
-    # Embodiment (read-only)
-    embodiment_view = summarize_embodiment(state["embodiment_ledger"])
+    # -----------------------------
+    # Local embodiment (PREBIRTH)
+    # -----------------------------
+    local_embodiment = None
+    if state.get("birth_state") is None:
+        local_embodiment = state["scuttling_engine"].candidates_snapshot()
 
-    # Womb (read-only)
+    # -----------------------------
+    # Womb
+    # -----------------------------
     womb_view = None
-    if state["last_womb_state"]:
+    if state.get("last_womb_state"):
         ws = state["last_womb_state"]
         womb_view = {
             "tick": ws.tick,
@@ -136,9 +134,11 @@ def system_snapshot(state: dict) -> dict:
             "womb_active": ws.womb_active,
         }
 
-    # Birth (read-only)
+    # -----------------------------
+    # Birth
+    # -----------------------------
     birth_view = None
-    if state["birth_state"]:
+    if state.get("birth_state"):
         bs = state["birth_state"]
         birth_view = {
             "born": bs.born,
@@ -147,113 +147,89 @@ def system_snapshot(state: dict) -> dict:
         }
 
     return {
-        "ticks": int(state["ticks"]),
+        "ticks": state["ticks"],
         "metrics": metrics,
         "active_frame": frames.active,
-        "memory_count": int(memory.count()),
-        "prediction_error": float(state["prediction_error"]),
-        "gates": gate_view,
-        "embodiment": embodiment_view,
+        "memory_count": memory.count(),
+        "prediction_error": state.get("prediction_error", 0.0),
+
         "womb": womb_view,
         "birth": birth_view,
+
+        "local_embodiment": local_embodiment,
+        "embodiment": embodiment_view,
     }
 
 
 # ============================================================
-# FRAME OPERATIONS (PUBLIC API)
+# FRAME OPERATIONS
 # ============================================================
 
-def open_frame(state: dict, *, domain: str = "genesis", label: str = "phase") -> None:
-    frames: FrameStore = state["frames"]
-    if frames.active is None:
-        frames.open(Frame(domain=domain, label=label))
+def open_frame(state: dict, *, domain="demo", label="ui") -> None:
+    if state["frames"].active is None:
+        state["frames"].open(Frame(domain=domain, label=label))
 
 
-def add_phase_signal(
-    state: dict,
-    *,
-    phase: str,
-    payload: dict | None = None,
-) -> None:
-    """
-    Add a PHASE signal to the active frame.
-
-    This replaces fragment-level UI semantics.
-    """
-    frames: FrameStore = state["frames"]
-    if frames.active:
-        frames.active.add(
-            Fragment(
-                kind="phase_signal",
-                payload={
-                    "phase": phase,
-                    **(payload or {}),
-                },
-            )
+def add_fragment(state: dict, *, kind="phase", payload=None) -> None:
+    if state["frames"].active:
+        state["frames"].active.add(
+            Fragment(kind=kind, payload=payload or {})
         )
 
 
 def close_frame(state: dict) -> None:
-    frames: FrameStore = state["frames"]
-    memory: StructuralMemory = state["memory"]
-    gate_engine: GateEngine | None = state.get("gate_engine")
-
-    frame = frames.active
-    if frame is None:
+    frames = state["frames"]
+    if not frames.active:
         return
 
-    Z = float(state["last_fragmentation"])
-    coherence = float(state["last_coherence"])
-    load = float(state["structural_load"])
+    Z = state["last_fragmentation"]
+    coherence = state["last_coherence"]
+    load = state["structural_load"]
     stability = coherence * (1.0 - load)
 
     try:
-        memory.add_trace(
+        state["memory"].add_trace(
             MemoryTrace(
                 state["ticks"],
                 Z,
                 coherence,
                 stability,
-                f"{frame.domain}:{frame.label}",
+                f"{frames.active.domain}:{frames.active.label}",
                 1.0,
-                ["episode", "stable"] if stability >= 0.7 else ["episode", "unstable"],
+                ["episode"],
             )
         )
     except Exception:
         pass
-
-    if gate_engine:
-        try:
-            gate_engine.evaluate(coherence, Z, load)
-        except Exception:
-            pass
 
     state["structural_load"] *= 0.6
     frames.close()
 
 
 # ============================================================
-# TICK (TIME + WOMB + BIRTH)
+# TICK — AUTHORITATIVE
 # ============================================================
 
 def tick_system(state: dict) -> None:
     state["ticks"] += 1
     tick = state["ticks"]
 
-    # Womb physics
+    # womb physics
     state["last_womb_state"] = state["womb_engine"].step()
 
-    # Structural load decay / increase
-    frames: FrameStore = state["frames"]
-    load = float(state["structural_load"])
-    state["structural_load"] = max(
-        0.0,
-        min(1.0, load + 0.05 if frames.active else load * 0.6),
-    )
+    # scuttling (ONLY if not born)
+    if state.get("birth_state") is None:
+        state["scuttling_engine"].step()
 
-    # Birth evaluation
+    # structural load
+    if state["frames"].active:
+        state["structural_load"] = min(1.0, state["structural_load"] + 0.05)
+    else:
+        state["structural_load"] *= 0.6
+
+    # birth evaluation
     if state["birth_state"] is None:
-        evaluator: BirthEvaluator = state["birth_evaluator"]
+        evaluator = state["birth_evaluator"]
         metrics = {
             "Stability": state["last_coherence"] * (1.0 - state["structural_load"]),
             "Load": state["structural_load"],
