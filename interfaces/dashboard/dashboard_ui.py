@@ -150,7 +150,7 @@ def render_dashboard(state, snapshot):
         st.caption("No gate data available.")
 
     # ---------------------------------
-    # EMBODIMENT (READ-ONLY, NEW)
+    # EMBODIMENT (READ-ONLY)
     # ---------------------------------
     st.subheader("Embodiment Ledger Summary")
 
@@ -163,6 +163,21 @@ def render_dashboard(state, snapshot):
         ])
     else:
         st.caption("No embodied invariants consolidated yet.")
+
+    # ---------------------------------
+    # PREBIRTH / WOMB (READ-ONLY)
+    # ---------------------------------
+    st.subheader("Prebirth — Womb State")
+
+    womb = data.get("womb")
+
+    if womb:
+        st.table([
+            {"metric": k, "value": v}
+            for k, v in womb.items()
+        ])
+    else:
+        st.caption("Womb inactive or birth complete.")
 
     # ---------------------------------
     # MEMORY TIMELINE
