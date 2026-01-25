@@ -1,29 +1,22 @@
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
+from typing import List
+from .fragment import Fragment
 
 
 @dataclass
 class Frame:
     """
-    Developmental frame.
+    Structural frame container.
 
-    A frame represents a bounded window of growth.
-    It contains PHASES, not fragments.
+    Frames:
+    - hold structural signals (phase, perception, contact, etc.)
+    - are NOT semantic
+    - do NOT imply learning or intention
     """
 
     domain: str
     label: str
+    fragments: List[Fragment] = field(default_factory=list)
 
-    # Developmental phases occurring in this frame
-    phases: List[Dict[str, Any]] = field(default_factory=list)
-
-    def add_phase(self, phase: Dict[str, Any]) -> None:
-        """
-        Add a developmental phase marker.
-
-        Phase examples:
-        - prebirth_growth
-        - limb_formation
-        - neural_rhythm
-        """
-        self.phases.append(phase)
+    def add(self, fragment: Fragment) -> None:
+        self.fragments.append(fragment)
