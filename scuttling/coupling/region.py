@@ -1,39 +1,45 @@
 from __future__ import annotations
-
 from dataclasses import dataclass, field
+
 from .local_state import LocalState
 
 
 @dataclass
 class CoupledRegion:
     """
-    A named embodied region that participates in coupling.
+    Structural region node in the scuttling graph.
 
-    This is NOT cognition.
-    This is NOT memory.
-    This is a physical / reflexive unit.
+    - Owns a LocalState (physics)
+    - Participates in coupling topology
+    - Does NOT reason or decide
     """
 
     name: str
     state: LocalState = field(default_factory=LocalState)
 
     # -------------------------------------------------
-    # Signal handling
+    # Pass-through physiology
+    # -------------------------------------------------
+
+    def recover(self, rate: float = 0.02) -> None:
+        self.state.recover(rate)
+
+    def apply_load(self, delta: float) -> None:
+        self.state.apply_load(delta)
+
+    def relieve_load(self, delta: float) -> None:
+        self.state.relieve_load(delta)
+
+    # -------------------------------------------------
+    # Structural checks
     # -------------------------------------------------
 
     def can_resolve_locally(self) -> bool:
-        """
-        Whether this region can handle its current state
-        without propagating upward.
-        """
-        return not (
-            self.state.overloaded()
-            or self.state.unstable()
-            or self.state.exhausted()
-        )
+        return not (self.state.overloaded() or self.state.unstable())
 
     def clear_signals(self) -> None:
         """
-        Clear transient stress via passive recovery.
+        Reserved for transient signal clearing.
+        (No-op for now.)
         """
-        self.state.recover()
+        pass
