@@ -9,33 +9,37 @@ from .region import CoupledRegion
 @dataclass
 class CouplingGraph:
     """
-    Local coupling topology.
+    Structural coupling topology for embodied scuttling.
 
-    This graph defines how embodied regions are physically and
-    reflexively connected.
+    Doctrine:
+    - Purely physical
+    - No symbols
+    - No memory
+    - No decisions
+    - No gates
 
-    The graph:
-    - propagates load and signals
-    - allows local resolution before escalation
-    - has no concept of intention, planning, or memory
-
-    It is a structural map, not a control system.
+    Purpose:
+    - Allow load / recovery to propagate implicitly
+    - Provide a stable snapshot for embodiment candidate extraction
     """
 
     regions: Dict[str, CoupledRegion] = field(default_factory=dict)
     edges: Dict[str, Set[str]] = field(default_factory=dict)
 
-    # -------------------------------------------------
-    # Region management
-    # -------------------------------------------------
+    # =========================================================
+    # REGION MANAGEMENT
+    # =========================================================
 
     def add_region(self, region: CoupledRegion) -> None:
+        """
+        Register a new embodied region.
+        """
         self.regions[region.name] = region
         self.edges.setdefault(region.name, set())
 
     def connect(self, a: str, b: str) -> None:
         """
-        Create a bidirectional coupling between regions.
+        Bidirectional physical coupling.
         """
         if a not in self.regions or b not in self.regions:
             raise ValueError("Both regions must exist before connecting")
@@ -43,35 +47,66 @@ class CouplingGraph:
         self.edges.setdefault(a, set()).add(b)
         self.edges.setdefault(b, set()).add(a)
 
-    # -------------------------------------------------
-    # Queries
-    # -------------------------------------------------
-
-    def neighbors(self, region: str) -> Iterable[CoupledRegion]:
-        """
-        Yield neighboring regions.
-        """
-        for name in self.edges.get(region, set()):
-            yield self.regions[name]
+    # =========================================================
+    # QUERIES
+    # =========================================================
 
     def get(self, name: str) -> CoupledRegion:
         return self.regions[name]
 
-    # -------------------------------------------------
-    # Local propagation support
-    # -------------------------------------------------
+    def neighbors(self, name: str) -> Iterable[CoupledRegion]:
+        for n in self.edges.get(name, set()):
+            yield self.regions[n]
+
+    def all_regions(self) -> Iterable[CoupledRegion]:
+        return self.regions.values()
+
+    # =========================================================
+    # SCUTTLING SUPPORT
+    # =========================================================
 
     def unresolved_regions(self) -> Iterable[CoupledRegion]:
         """
-        Regions that cannot resolve locally and may require propagation.
+        Regions that cannot currently resolve locally.
         """
         for region in self.regions.values():
             if not region.can_resolve_locally():
                 yield region
 
-    def clear_all_signals(self) -> None:
+    def recover_all(self, rate: float = 0.02) -> None:
         """
-        Clear transient signals across all regions.
+        Passive recovery applied globally (prebirth + idle).
         """
         for region in self.regions.values():
-            region.clear_signals()
+            region.recover(rate)
+
+    # =========================================================
+    # SNAPSHOT (FOR EMBODIMENT CANDIDATES)
+    # =========================================================
+
+    def snapshot(self) -> Dict[str, Dict[str, float]]:
+        """
+        Structural snapshot of all embodied regions.
+
+        This is the ONLY legal output used by:
+        - embodiment.local.candidates.CandidateBuilder
+
+        Format:
+        {
+            region_name: {
+                "load": float,
+                "stability": float,
+                "fatigue": float,
+                "integrity": float,
+            }
+        }
+        """
+        return {
+            name: {
+                "load": r.state.load,
+                "stability": r.state.stability,
+                "fatigue": r.state.fatigue,
+                "integrity": r.state.integrity,
+            }
+            for name, r in self.regions.items()
+        }
