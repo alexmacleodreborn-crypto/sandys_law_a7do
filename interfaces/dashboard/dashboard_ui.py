@@ -80,17 +80,20 @@ def render_dashboard(state, snapshot):
                 else "none"
             ),
             "memory_count": data["memory_count"],
+            "born": data.get("birth", {}).get("born") if data.get("birth") else False,
         }
     )
 
     # ---------------------------------
     # METRICS
     # ---------------------------------
-    st.subheader("Metrics")
-    m1, m2, m3 = st.columns(3)
+    st.subheader("Structural Metrics")
+    m1, m2, m3, m4 = st.columns(4)
+
     m1.metric("Z (Fragmentation)", round(metrics["Z"], 3))
     m2.metric("Coherence", round(metrics["Coherence"], 3))
     m3.metric("Stability", round(metrics["Stability"], 3))
+    m4.metric("Load", round(metrics["Load"], 3))
 
     # ---------------------------------
     # RECORD HISTORY
@@ -129,7 +132,7 @@ def render_dashboard(state, snapshot):
     st.pyplot(fig)
 
     # ---------------------------------
-    # GATES
+    # GATES (READ-ONLY)
     # ---------------------------------
     st.subheader("Gates")
 
@@ -165,7 +168,7 @@ def render_dashboard(state, snapshot):
         st.caption("No embodied invariants consolidated yet.")
 
     # ---------------------------------
-    # PREBIRTH / WOMB (READ-ONLY)
+    # PREBIRTH / WOMB
     # ---------------------------------
     st.subheader("Prebirth — Womb State")
 
@@ -178,6 +181,18 @@ def render_dashboard(state, snapshot):
         ])
     else:
         st.caption("Womb inactive or birth complete.")
+
+    # ---------------------------------
+    # BIRTH STATE
+    # ---------------------------------
+    st.subheader("Birth Evaluation")
+
+    birth = data.get("birth")
+
+    if birth:
+        st.json(birth)
+    else:
+        st.caption("Birth not yet evaluated.")
 
     # ---------------------------------
     # MEMORY TIMELINE
@@ -218,5 +233,5 @@ def render_dashboard(state, snapshot):
     # ---------------------------------
     # FINAL STATE
     # ---------------------------------
-    st.subheader("Final State")
+    st.subheader("Final State Snapshot")
     st.json(data)
