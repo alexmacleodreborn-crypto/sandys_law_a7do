@@ -45,3 +45,7 @@ render_dashboard(
     st.session_state.a7do_state,
     st.session_state.a7do_snapshot,
 )
+
+render_chat(
+    st.session_state.a7do_snapshot
+)
