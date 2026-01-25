@@ -1,40 +1,24 @@
-# embodiment/ledger/entry.py
-
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Tuple, FrozenSet
+
+from embodiment.ledger.invariants import EmbodimentKind
 
 
 @dataclass(frozen=True)
 class LedgerEntry:
     """
     A grounded embodied invariant.
-
-    This represents something that has remained stable across
-    repeated lived experience under constrained conditions.
-
-    Ledger entries are:
-    - conditional
-    - conservative
-    - versioned
-    - grounded in interaction
     """
 
-    # identity
-    kind: str                     # e.g. "boundary", "thermal", "pain", "skill", "ownership"
-    regions: FrozenSet[str]       # body or surface regions involved
+    kind: EmbodimentKind
+    regions: FrozenSet[str]
+    conditions: Tuple[str, ...]
 
-    # conditions
-    conditions: Tuple[str, ...]   # symbolic constraints (NOT logic)
+    support: int
+    stability: float
+    confidence: float
 
-    # support
-    support: int                  # number of supporting episodes
-    stability: float              # [0..1] structural stability
-
-    # confidence
-    confidence: float             # derived, monotonic, slow-changing
-
-    # versioning
     version: int = 1
 
     def revise(
@@ -44,10 +28,6 @@ class LedgerEntry:
         stability_delta: float,
         confidence_delta: float,
     ) -> "LedgerEntry":
-        """
-        Create a revised version of this entry.
-        Revisions never overwrite history.
-        """
         return LedgerEntry(
             kind=self.kind,
             regions=self.regions,
