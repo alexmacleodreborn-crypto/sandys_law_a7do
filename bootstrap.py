@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Dict
+from typing import Callable
 
 from sandys_law_a7do.frames.store import FrameStore
 from sandys_law_a7do.memory.structural_memory import StructuralMemory
@@ -13,23 +13,25 @@ def build_system() -> tuple[Callable[[], dict], dict]:
         "frames": FrameStore(),
         "memory": StructuralMemory(),
         "gate_engine": GateEngine(),
-        "scuttling_engine": ScuttlingEngine(),
+        "scuttling": ScuttlingEngine(),
         "last_coherence": 0.0,
         "last_fragmentation": 0.0,
         "structural_load": 0.0,
     }
 
-    def snapshot():
+    def snapshot() -> dict:
+        coherence = state["last_coherence"]
+        load = state["structural_load"]
+
         return {
             "ticks": state["ticks"],
             "metrics": {
                 "Z": state["last_fragmentation"],
-                "Coherence": state["last_coherence"],
-                "Stability": state["last_coherence"]
-                * (1.0 - state["structural_load"]),
-                "Load": state["structural_load"],
+                "Coherence": coherence,
+                "Load": load,
+                "Stability": coherence * (1.0 - load),
             },
-            "scuttling_candidates": state["scuttling_engine"].candidates_snapshot(),
+            "embodiment_candidates": state["scuttling"].candidates_snapshot(),
         }
 
     return snapshot, state
@@ -37,4 +39,4 @@ def build_system() -> tuple[Callable[[], dict], dict]:
 
 def tick_system(state: dict) -> None:
     state["ticks"] += 1
-    state["scuttling_engine"].step(tick=state["ticks"])
+    state["scuttling"].step()
