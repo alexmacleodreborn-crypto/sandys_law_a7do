@@ -1,12 +1,6 @@
-from .entry import LedgerEntry
-from .ledger import EmbodimentLedger
-from .summary import EmbodimentSummary, summarize_ledger
-from .invariants import EmbodimentKind
+# embodiment/__init__.py
 
-__all__ = [
-    "LedgerEntry",
-    "EmbodimentLedger",
-    "EmbodimentSummary",
-    "summarize_ledger",
-    "EmbodimentKind",
-]
+from embodiment.ledger.ledger import EmbodimentLedger
+from embodiment.ledger.entry import LedgerEntry
+from embodiment.ledger.invariants import EmbodimentKind
+from embodiment.ledger.summary import EmbodimentSummary
