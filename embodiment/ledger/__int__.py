@@ -1,6 +1,4 @@
-# embodiment/__init__.py
-
-from embodiment.ledger.ledger import EmbodimentLedger
-from embodiment.ledger.entry import LedgerEntry
-from embodiment.ledger.invariants import EmbodimentKind
-from embodiment.ledger.summary import EmbodimentSummary
+from .ledger import EmbodimentLedger
+from .entry import LedgerEntry
+from .invariants import EmbodimentKind
+from .summary import EmbodimentSummary
