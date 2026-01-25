@@ -9,6 +9,7 @@ Responsibilities:
 - Memory commit on frame close
 - Gate evaluation at episode boundary
 - Dashboard-safe snapshots
+- Prebirth womb environment (READ-ONLY)
 
 AUTHORITATIVE FILE
 """
@@ -25,9 +26,12 @@ from sandys_law_a7do.memory.trace import MemoryTrace
 
 from sandys_law_a7do.gates.engine import GateEngine
 
-# NEW — embodiment (read-only)
+# Embodiment (read-only)
 from embodiment.ledger.ledger import EmbodimentLedger
 from embodiment.bridge.accountant import summarize_embodiment
+
+# NEW — Prebirth womb physics (read-only, no agency)
+from genesis.womb.physics import WombPhysicsEngine
 
 
 # ============================================================
@@ -59,14 +63,20 @@ def _normalize_gate(gs: Any) -> Dict[str, Any]:
 
 def build_system() -> Tuple[Callable[[], dict], dict]:
     state = {
+        # time
         "ticks": 0,
 
+        # core systems
         "frames": FrameStore(),
         "memory": StructuralMemory(),
         "gate_engine": GateEngine(),
 
-        # NEW — embodiment substrate (no behaviour)
+        # embodiment substrate (NO BEHAVIOUR)
         "embodiment_ledger": EmbodimentLedger(),
+
+        # prebirth womb environment (NO AGENCY)
+        "womb_engine": WombPhysicsEngine(),
+        "last_womb_state": None,
 
         # structural metrics (written elsewhere)
         "last_coherence": 0.0,
@@ -82,7 +92,7 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
 
 
 # ============================================================
-# SNAPSHOT
+# SNAPSHOT (READ-ONLY)
 # ============================================================
 
 def system_snapshot(state: dict) -> dict:
@@ -102,6 +112,9 @@ def system_snapshot(state: dict) -> dict:
         "Load": load,
     }
 
+    # -----------------------------
+    # Gates (read-only)
+    # -----------------------------
     gate_view: Dict[str, Dict[str, Any]] = {}
 
     if gate_engine:
@@ -110,11 +123,27 @@ def system_snapshot(state: dict) -> dict:
         for name, gs in gates.items():
             gate_view[str(name)] = _normalize_gate(gs)
 
-    # OPTIONAL — read-only embodiment summary
+    # -----------------------------
+    # Embodiment (read-only)
+    # -----------------------------
     embodiment_view = None
     ledger = state.get("embodiment_ledger")
     if ledger is not None:
         embodiment_view = summarize_embodiment(ledger)
+
+    # -----------------------------
+    # Womb (read-only)
+    # -----------------------------
+    womb_view = None
+    womb_state = state.get("last_womb_state")
+    if womb_state is not None:
+        womb_view = {
+            "tick": womb_state.tick,
+            "heartbeat_rate": womb_state.heartbeat_rate,
+            "ambient_load": womb_state.ambient_load,
+            "rhythmic_stability": womb_state.rhythmic_stability,
+            "womb_active": womb_state.womb_active,
+        }
 
     return {
         "ticks": int(state["ticks"]),
@@ -123,7 +152,8 @@ def system_snapshot(state: dict) -> dict:
         "memory_count": int(memory.count()),
         "prediction_error": float(state.get("prediction_error", 0.0)),
         "gates": gate_view,
-        "embodiment": embodiment_view,  # visible, inert
+        "embodiment": embodiment_view,
+        "womb": womb_view,
     }
 
 
@@ -183,12 +213,22 @@ def close_frame(state: dict) -> None:
 
 
 # ============================================================
-# TICK
+# TICK (TIME + WOMB ONLY)
 # ============================================================
 
 def tick_system(state: dict) -> None:
     state["ticks"] += 1
 
+    # -----------------------------
+    # Prebirth — womb physics
+    # -----------------------------
+    womb = state.get("womb_engine")
+    if womb is not None:
+        state["last_womb_state"] = womb.step()
+
+    # -----------------------------
+    # Structural load (existing logic)
+    # -----------------------------
     frames: FrameStore = state["frames"]
     load = float(state.get("structural_load", 0.0))
 
