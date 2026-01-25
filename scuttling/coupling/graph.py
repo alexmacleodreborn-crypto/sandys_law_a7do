@@ -17,7 +17,7 @@ class CouplingGraph:
         self.edges.setdefault(a, set()).add(b)
         self.edges.setdefault(b, set()).add(a)
 
-    def snapshot(self):
+    def snapshot(self) -> dict:
         return {
             name: {
                 "load": r.state.load,
