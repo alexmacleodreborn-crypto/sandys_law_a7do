@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from embodiment.ledger.entry import LedgerEntry
-from embodiment.consolidation.ledger import EmbodimentLedger
+from embodiment.ledger.ledger import EmbodimentLedger
 
 
 # ============================================================
