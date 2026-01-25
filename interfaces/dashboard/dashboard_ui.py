@@ -43,7 +43,7 @@ def render_dashboard(state, snapshot):
     st.json({
         "ticks": data["ticks"],
         "active_frame": str(data["active_frame"]),
-        "born": data.get("birth", {}).get("born", False),
+    "born": bool(data.get("birth") and data["birth"].get("born")),
     })
 
     # ---------------------------------
