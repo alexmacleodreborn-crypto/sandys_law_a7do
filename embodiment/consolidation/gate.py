@@ -1,11 +1,12 @@
+# embodiment/consolidation/gate.py
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Iterable
+from typing import Optional
 
 from embodiment.ledger.entry import LedgerEntry
-from embodiment.ledger.ledger import EmbodimentLedger
-from embodiment.local.candidates import EmbodimentCandidate
+from embodiment.consolidation.ledger import EmbodimentLedger
 
 
 # ============================================================
@@ -15,133 +16,111 @@ from embodiment.local.candidates import EmbodimentCandidate
 @dataclass(frozen=True)
 class ConsolidationDecision:
     """
-    Result of consolidation evaluation.
+    Outcome of a consolidation attempt.
     """
-    action: str                  # "accept", "revise", "defer"
+    accepted: bool
     reason: str
-    entry: Optional[LedgerEntry]
+    revised_entry: Optional[LedgerEntry] = None
 
 
 # ============================================================
 # Consolidation Gate
+#
+# This is the ONLY component allowed to write to the Ledger.
 # ============================================================
 
 class ConsolidationGate:
     """
-    The sole authority for writing embodied invariants.
+    Conservative gate for embodied invariants.
 
-    This gate is:
+    Properties:
+    - deterministic
     - conservative
-    - evidence-based
-    - structure-preserving
-    - side-effect minimal
+    - monotonic (confidence/support only increase)
     """
 
-    # ---------------------------------
-    # Thresholds (v1, conservative)
-    # ---------------------------------
-    MIN_SUPPORT = 5
-    MIN_STABILITY = 0.65
+    # ----------------------------
+    # Thresholds (v1 — strict)
+    # ----------------------------
+    MIN_SUPPORT = 3
+    MIN_STABILITY = 0.6
     MIN_CONFIDENCE = 0.5
 
-    MAX_CONFIDENCE_STEP = 0.1
-    MAX_STABILITY_STEP = 0.1
-
-    # ---------------------------------
-    # Main evaluation
-    # ---------------------------------
+    # ----------------------------
+    # Public API
+    # ----------------------------
 
     def evaluate(
         self,
         *,
-        candidate: EmbodimentCandidate,
+        candidate: LedgerEntry,
         ledger: EmbodimentLedger,
     ) -> ConsolidationDecision:
         """
-        Evaluate a candidate for embodiment consolidation.
-
-        This function is deterministic and auditable.
+        Decide whether a candidate invariant may be consolidated.
         """
 
-        # Rule 1: insufficient evidence
-        if candidate.support < self.MIN_SUPPORT:
-            return self._defer("insufficient_support")
+        key = ledger._key(candidate)
+        current = ledger.latest(key)
 
-        if candidate.stability < self.MIN_STABILITY:
-            return self._defer("insufficient_stability")
+        # ----------------------------
+        # First appearance
+        # ----------------------------
+        if current is None:
+            if not self._meets_minimums(candidate):
+                return ConsolidationDecision(
+                    accepted=False,
+                    reason="insufficient_initial_support",
+                )
 
-        # Rule 2: locate existing entry (if any)
-        existing = ledger.find_matching(
-            kind=candidate.kind,
-            regions=candidate.regions,
-            conditions=candidate.conditions,
-        )
+            ledger.add(candidate)
+            return ConsolidationDecision(
+                accepted=True,
+                reason="new_invariant",
+                revised_entry=candidate,
+            )
 
-        if existing is None:
-            return self._accept_new(candidate)
+        # ----------------------------
+        # Revision of existing invariant
+        # ----------------------------
+        if not self._consistent(candidate, current):
+            return ConsolidationDecision(
+                accepted=False,
+                reason="contradicts_existing_invariant",
+            )
 
-        # Rule 3: revision path
-        return self._revise_existing(candidate, existing)
-
-    # --------------------------------------------------------
-    # Accept new invariant
-    # --------------------------------------------------------
-
-    def _accept_new(
-        self,
-        candidate: EmbodimentCandidate,
-    ) -> ConsolidationDecision:
-        entry = LedgerEntry(
-            kind=candidate.kind,
-            regions=candidate.regions,
-            conditions=candidate.conditions,
-            support=candidate.support,
-            stability=min(1.0, candidate.stability),
-            confidence=min(1.0, candidate.confidence),
-            version=1,
-        )
-
-        return ConsolidationDecision(
-            action="accept",
-            reason="new_invariant_stable",
-            entry=entry,
-        )
-
-    # --------------------------------------------------------
-    # Revise existing invariant
-    # --------------------------------------------------------
-
-    def _revise_existing(
-        self,
-        candidate: EmbodimentCandidate,
-        existing: LedgerEntry,
-    ) -> ConsolidationDecision:
-        revised = existing.revise(
+        revised = current.revise(
             added_support=candidate.support,
-            stability_delta=min(
-                self.MAX_STABILITY_STEP,
-                candidate.stability - existing.stability,
-            ),
-            confidence_delta=min(
-                self.MAX_CONFIDENCE_STEP,
-                candidate.confidence - existing.confidence,
-            ),
+            stability_delta=candidate.stability - current.stability,
+            confidence_delta=candidate.confidence - current.confidence,
         )
 
+        ledger.add(revised)
         return ConsolidationDecision(
-            action="revise",
-            reason="consistent_with_existing_invariant",
-            entry=revised,
+            accepted=True,
+            reason="invariant_revised",
+            revised_entry=revised,
         )
 
     # --------------------------------------------------------
-    # Defer utility
+    # Internal checks
     # --------------------------------------------------------
 
-    @staticmethod
-    def _defer(reason: str) -> ConsolidationDecision:
-        return ConsolidationDecision(
-            action="defer",
-            reason=reason,
-            entry=None,
+    def _meets_minimums(self, entry: LedgerEntry) -> bool:
+        return (
+            entry.support >= self.MIN_SUPPORT
+            and entry.stability >= self.MIN_STABILITY
+            and entry.confidence >= self.MIN_CONFIDENCE
         )
+
+    def _consistent(self, new: LedgerEntry, old: LedgerEntry) -> bool:
+        """
+        Conservative consistency check.
+        """
+        if new.kind != old.kind:
+            return False
+        if new.regions != old.regions:
+            return False
+        if new.conditions != old.conditions:
+            return False
+        return True
