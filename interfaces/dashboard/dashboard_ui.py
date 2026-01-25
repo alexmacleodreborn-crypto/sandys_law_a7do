@@ -7,6 +7,7 @@ from sandys_law_a7do.bootstrap import (
     close_frame,
 )
 from sandys_law_a7do.engine.tick_engine import step_tick
+from sandys_law_a7do.interfaces.chat.observer import render_chat_observer
 
 
 def render_dashboard(state, snapshot):
@@ -128,7 +129,7 @@ def render_dashboard(state, snapshot):
     st.pyplot(fig)
 
     # ---------------------------------
-    # GATES (FIXED)
+    # GATES
     # ---------------------------------
     st.subheader("Gates")
 
@@ -170,6 +171,19 @@ def render_dashboard(state, snapshot):
         ])
     else:
         st.caption("No memory traces recorded yet.")
+
+    # ---------------------------------
+    # CHAT OBSERVER (READ-ONLY)
+    # ---------------------------------
+    st.subheader("Observer Console")
+
+    observer_text = render_chat_observer(snapshot)
+
+    st.text_area(
+        label="A7DO Observer Output",
+        value=observer_text,
+        height=220,
+    )
 
     # ---------------------------------
     # FINAL STATE
