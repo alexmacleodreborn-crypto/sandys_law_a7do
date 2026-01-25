@@ -1,124 +1,39 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-
-# ============================================================
-# Local State Doctrine
-#
-# LocalState represents the immediate embodied condition
-# of a body region or local subsystem.
-#
-# It is:
-# - non-symbolic
-# - non-memory
-# - non-gated
-# - continuously updated
-#
-# LocalState does NOT:
-# - reason
-# - decide goals
-# - store knowledge
-#
-# It only exposes physical readiness and constraint.
-# ============================================================
+from dataclasses import dataclass, field
+from .local_state import LocalState
 
 
 @dataclass
-class LocalState:
+class CoupledRegion:
     """
-    Local embodied state for a region or subsystem.
+    A named embodied region that participates in coupling.
+
+    This is NOT cognition.
+    This is NOT memory.
+    This is a physical / reflexive unit.
     """
 
-    # ---------------------------------
-    # Core structural signals
-    # ---------------------------------
+    name: str
+    state: LocalState = field(default_factory=LocalState)
 
-    load: float = 0.0          # [0..1] mechanical / effort load
-    stability: float = 0.5     # [0..1] structural stability
-    fatigue: float = 0.0       # [0..1] accumulated strain
-    integrity: float = 1.0     # [0..1] tissue / system health
+    # -------------------------------------------------
+    # Signal handling
+    # -------------------------------------------------
 
-    # ---------------------------------
-    # Safety clamps
-    # ---------------------------------
-
-    MAX_LOAD: float = 1.0
-    MAX_FATIGUE: float = 1.0
-    MIN_INTEGRITY: float = 0.0
-
-    # ========================================================
-    # Update methods (pure structural)
-    # ========================================================
-
-    def apply_load(self, delta: float) -> None:
+    def can_resolve_locally(self) -> bool:
         """
-        Apply additional load to the local system.
+        Whether this region can handle its current state
+        without propagating upward.
         """
-        self.load = min(self.MAX_LOAD, max(0.0, self.load + delta))
-
-        # Load increases fatigue nonlinearly
-        if delta > 0:
-            self.fatigue = min(
-                self.MAX_FATIGUE,
-                self.fatigue + (delta * 0.5),
-            )
-
-        self._recompute_stability()
-
-    def relieve_load(self, delta: float) -> None:
-        """
-        Reduce load (e.g. via reflex withdrawal or release).
-        """
-        self.load = max(0.0, self.load - abs(delta))
-        self._recompute_stability()
-
-    def apply_damage(self, severity: float) -> None:
-        """
-        Apply integrity damage (rare, conservative).
-        """
-        self.integrity = max(
-            self.MIN_INTEGRITY,
-            self.integrity - abs(severity),
-        )
-        self._recompute_stability()
-
-    def recover(self, rate: float = 0.02) -> None:
-        """
-        Passive recovery when idle.
-        """
-        self.fatigue = max(0.0, self.fatigue - rate)
-        self.load = max(0.0, self.load - rate)
-        self._recompute_stability()
-
-    # ========================================================
-    # Internal logic
-    # ========================================================
-
-    def _recompute_stability(self) -> None:
-        """
-        Stability decreases with load and fatigue,
-        increases with integrity.
-        """
-        self.stability = max(
-            0.0,
-            min(
-                1.0,
-                self.integrity
-                * (1.0 - self.load)
-                * (1.0 - self.fatigue),
-            ),
+        return not (
+            self.state.overloaded()
+            or self.state.unstable()
+            or self.state.exhausted()
         )
 
-    # ========================================================
-    # Read-only helpers
-    # ========================================================
-
-    def overloaded(self) -> bool:
-        return self.load >= 0.85
-
-    def unstable(self) -> bool:
-        return self.stability <= 0.35
-
-    def exhausted(self) -> bool:
-        return self.fatigue >= 0.8
+    def clear_signals(self) -> None:
+        """
+        Clear transient stress via passive recovery.
+        """
+        self.state.recover()
