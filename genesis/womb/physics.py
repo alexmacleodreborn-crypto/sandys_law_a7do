@@ -8,83 +8,94 @@ from typing import Dict
 # ============================================================
 # Womb Physics Doctrine
 #
-# - External
-# - Rhythmic
-# - Non-agentic
+# - External environment
 # - Deterministic
+# - Rhythmic
+# - Non-interactive
 #
-# This module represents the physical environment
-# before A7DO has agency, memory, or embodiment.
+# Womb physics:
+# - does NOT learn
+# - does NOT gate
+# - does NOT allow choice
+# - does NOT write memory
+#
+# It only exposes structure over time.
 # ============================================================
 
 
-@dataclass(frozen=True)
-class WombSignals:
+@dataclass
+class WombState:
     """
-    External physical signals imposed on the system.
+    Current physical womb conditions.
+    """
+    tick: int
+    heartbeat_rate: float       # beats per tick
+    ambient_load: float         # [0..1]
+    rhythmic_stability: float   # [0..1]
+    womb_active: bool = True
+
+
+class WombPhysicsEngine:
+    """
+    Generates deterministic womb signals over time.
     """
 
-    heartbeat_phase: float        # [0..1] cyclic
-    ambient_load: float           # [0..1]
-    sensory_intensity: float      # [0..1]
-    reflex_allowed: bool          # always True in womb
-
-
-class WombPhysics:
-    """
-    Deterministic womb environment.
-    """
-
-    # --------------------------------------------------------
-    # Parameters (conservative, biological-inspired)
-    # --------------------------------------------------------
-    HEARTBEAT_RATE = 0.8           # cycles per time unit
-    BASE_LOAD = 0.3
-    LOAD_VARIANCE = 0.1
-    SENSORY_BASE = 0.2
-    SENSORY_VARIANCE = 0.15
+    # ---------------------------------
+    # Constants (conservative, stable)
+    # ---------------------------------
+    BASE_HEARTBEAT = 0.25        # baseline rhythmic pulse
+    HEARTBEAT_VARIANCE = 0.02
+    BASE_LOAD = 0.15
+    LOAD_DRIFT = 0.001
 
     def __init__(self) -> None:
-        self._time = 0.0
+        self._tick = 0
 
-    # --------------------------------------------------------
-    # Advance time
-    # --------------------------------------------------------
+    # ---------------------------------
+    # Step
+    # ---------------------------------
 
-    def step(self, dt: float = 1.0) -> WombSignals:
+    def step(self) -> WombState:
         """
-        Advance womb physics by dt time units.
+        Advance womb physics by one tick.
         """
-        self._time += dt
 
-        heartbeat = (self._time * self.HEARTBEAT_RATE) % 1.0
+        self._tick += 1
 
-        # Gentle oscillatory load
-        load = self.BASE_LOAD + self.LOAD_VARIANCE * self._oscillate(self._time)
-
-        # Soft sensory field
-        sensory = self.SENSORY_BASE + self.SENSORY_VARIANCE * self._oscillate(
-            self._time + 0.5
+        # Rhythmic heartbeat (slow oscillation)
+        heartbeat = (
+            self.BASE_HEARTBEAT
+            + self.HEARTBEAT_VARIANCE
+            * ((self._tick % 20) - 10) / 10.0
         )
 
-        return WombSignals(
-            heartbeat_phase=heartbeat,
-            ambient_load=self._clip01(load),
-            sensory_intensity=self._clip01(sensory),
-            reflex_allowed=True,
+        # Ambient load rises very slowly over time
+        load = min(
+            0.35,
+            self.BASE_LOAD + self._tick * self.LOAD_DRIFT,
         )
 
-    # --------------------------------------------------------
-    # Utilities
-    # --------------------------------------------------------
+        # Stability increases as rhythm becomes predictable
+        rhythmic_stability = min(1.0, 0.3 + self._tick * 0.002)
+
+        return WombState(
+            tick=self._tick,
+            heartbeat_rate=round(heartbeat, 4),
+            ambient_load=round(load, 4),
+            rhythmic_stability=round(rhythmic_stability, 4),
+            womb_active=True,
+        )
+
+    # ---------------------------------
+    # Snapshot helper (dashboard safe)
+    # ---------------------------------
 
     @staticmethod
-    def _oscillate(t: float) -> float:
-        """
-        Simple bounded oscillation in [-1, 1].
-        """
-        return ((t % 2.0) - 1.0)
-
-    @staticmethod
-    def _clip01(v: float) -> float:
-        return max(0.0, min(1.0, v))
+    def as_dict(state: WombState) -> Dict[str, float]:
+        return {
+            "tick": state.tick,
+            "heartbeat_rate": state.heartbeat_rate,
+            "ambient_load": state.ambient_load,
+            "rhythmic_stability": state.rhythmic_stability,
+            "womb_active": state.womb_active,
+        }
