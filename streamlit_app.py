@@ -21,7 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
 # -----------------------------------------------------
 from sandys_law_a7do.bootstrap import build_system
 from sandys_law_a7do.interfaces.dashboard.dashboard_ui import render_dashboard
-
+from sandys_law_a7do.interfaces.chat.chat_ui import render_chat
 # -----------------------------------------------------
 # STREAMLIT CONFIG
 # -----------------------------------------------------
