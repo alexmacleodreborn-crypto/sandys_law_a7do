@@ -1,124 +1,145 @@
 """
-A7DO Chat Interface — Phase 0 (OBSERVATION ONLY)
+A7DO Chat Interface — OBSERVER ONLY (LOCKED)
 
-This UI:
-- exposes system state conversationally
-- does NOT modify system state
-- does NOT write memory
-- does NOT open gates
-- does NOT trigger embodiment
+Purpose:
+- Provide a conversational observational interface to A7DO
+- Read-only access via snapshot()
+- NO state mutation
+- NO cognition
+- NO learning
+- NO memory writes
 
-Language is an INTERFACE, not cognition.
+Chat is an INTERFACE, not an agent.
 """
 
 from __future__ import annotations
 
 import streamlit as st
-from typing import Dict, Any
+from typing import Callable, Dict, Any
 
 
-# ---------------------------------------------------------
-# Safe language adapter (minimal, non-semantic)
-# ---------------------------------------------------------
+# ============================================================
+# CHAT RENDERER
+# ============================================================
 
-class LanguageAdapter:
+def render_chat(snapshot: Callable[[], Dict[str, Any]]) -> None:
     """
-    Extremely conservative language interface.
+    Render a read-only conversational interface.
 
-    Converts user text into:
-    - observation requests
-    - status queries
-
-    NEVER:
-    - issues commands
-    - alters state
-    - injects beliefs
+    snapshot(): () -> dict
+    Must be the SAME snapshot used by the dashboard.
     """
 
-    @staticmethod
-    def parse(text: str) -> Dict[str, Any]:
-        t = text.lower().strip()
+    st.subheader("💬 A7DO — Observational Chat")
 
-        if any(k in t for k in ("status", "state", "how are you", "what's happening")):
-            return {"intent": "status"}
-
-        if any(k in t for k in ("memory", "remember", "learned")):
-            return {"intent": "memory"}
-
-        if any(k in t for k in ("gate", "gates")):
-            return {"intent": "gates"}
-
-        if any(k in t for k in ("embodiment", "body", "self")):
-            return {"intent": "embodiment"}
-
-        return {"intent": "unknown"}
-
-    @staticmethod
-    def respond(intent: Dict[str, Any], state: dict) -> str:
-        i = intent.get("intent")
-
-        if i == "status":
-            return (
-                f"Ticks: {state.get('ticks')}\n"
-                f"Active frame: {bool(state.get('active_frame'))}\n"
-                f"Stability: {state['metrics'].get('Stability'):.3f}"
-            )
-
-        if i == "memory":
-            return f"Memory traces recorded: {state.get('memory_count')}"
-
-        if i == "gates":
-            gates = state.get("gates", {})
-            if not gates:
-                return "No gate activity recorded."
-            return "\n".join(
-                f"{name}: {info.get('state')} (score={info.get('score')})"
-                for name, info in gates.items()
-            )
-
-        if i == "embodiment":
-            return (
-                "Embodiment exists as a ledger of invariants.\n"
-                "No embodiment entries are exposed through chat."
-            )
-
-        return (
-            "I can describe my current state.\n"
-            "I cannot take instructions or form beliefs."
-        )
-
-
-# ---------------------------------------------------------
-# Streamlit Chat UI
-# ---------------------------------------------------------
-
-def render_chat(snapshot_callable):
-    """
-    snapshot_callable: () -> dict
-    """
-
-    st.subheader("🧠 A7DO — Observational Chat")
-
+    # ---------------------------------
+    # SESSION CHAT HISTORY (LOCAL UI ONLY)
+    # ---------------------------------
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    # Display history
-    for speaker, msg in st.session_state.chat_history:
-        with st.chat_message(speaker):
-            st.markdown(msg)
-
-    # Input
-    user_input = st.chat_input("Ask about system state…")
+    # ---------------------------------
+    # USER INPUT
+    # ---------------------------------
+    user_input = st.text_input(
+        "Ask A7DO (observation only):",
+        placeholder="What is your current state?",
+        key="a7do_chat_input",
+    )
 
     if user_input:
-        st.session_state.chat_history.append(("user", user_input))
+        # Store user message
+        st.session_state.chat_history.append(
+            {"role": "user", "content": user_input}
+        )
 
-        # SAFE SNAPSHOT ONLY
-        state_view = snapshot_callable()
+        # Generate response (OBSERVATIONAL)
+        response = _generate_observational_response(
+            user_input=user_input,
+            snapshot=snapshot,
+        )
 
-        intent = LanguageAdapter.parse(user_input)
-        reply = LanguageAdapter.respond(intent, state_view)
+        st.session_state.chat_history.append(
+            {"role": "assistant", "content": response}
+        )
 
-        st.session_state.chat_history.append(("assistant", reply))
+    # ---------------------------------
+    # DISPLAY CHAT
+    # ---------------------------------
+    for msg in st.session_state.chat_history:
+        if msg["role"] == "user":
+            st.markdown(f"**You:** {msg['content']}")
+        else:
+            st.markdown(f"**A7DO:** {msg['content']}")
 
-        st.experimental_rerun()
+
+# ============================================================
+# RESPONSE GENERATION (READ-ONLY)
+# ============================================================
+
+def _generate_observational_response(
+    *,
+    user_input: str,
+    snapshot: Callable[[], Dict[str, Any]],
+) -> str:
+    """
+    Convert a user query into an observational response.
+
+    This function:
+    - Reads snapshot only
+    - Never mutates state
+    - Never infers beliefs
+    - Never claims intent or desire
+    """
+
+    data = snapshot()
+
+    ticks = data.get("ticks", 0)
+    metrics = data.get("metrics", {})
+    gates = data.get("gates", {})
+    memory_count = data.get("memory_count", 0)
+    prediction_error = data.get("prediction_error", 0.0)
+
+    text = user_input.lower()
+
+    # ---------------------------------
+    # SIMPLE OBSERVATIONAL INTENTS
+    # ---------------------------------
+    if "state" in text or "status" in text:
+        return (
+            f"I am currently at tick {ticks}. "
+            f"Stability is {metrics.get('Stability', 0.0):.2f}, "
+            f"coherence is {metrics.get('Coherence', 0.0):.2f}, "
+            f"fragmentation is {metrics.get('Z', 0.0):.2f}."
+        )
+
+    if "memory" in text:
+        return f"I have {memory_count} recorded memory traces."
+
+    if "gate" in text:
+        if not gates:
+            return "No gate information is currently available."
+        lines = []
+        for name, g in gates.items():
+            lines.append(
+                f"{name}: state={g.get('state')}, open={g.get('open')}"
+            )
+        return "Current gate states:\n" + "\n".join(lines)
+
+    if "prediction" in text or "error" in text:
+        return f"My current prediction error signal is {prediction_error:.3f}."
+
+    if "who are you" in text or "what are you" in text:
+        return (
+            "I am A7DO. I do not have beliefs or intentions. "
+            "I expose my internal structural state through observation."
+        )
+
+    # ---------------------------------
+    # DEFAULT RESPONSE
+    # ---------------------------------
+    return (
+        "I can report my current structural state, memory count, "
+        "gate conditions, and stability. "
+        "I do not decide or act through this interface."
+    )
