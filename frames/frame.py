@@ -1,15 +1,29 @@
-# sandys_law_a7do/frames/frame.py
-
 from dataclasses import dataclass, field
-from typing import List
-from .fragment import Fragment
+from typing import List, Dict, Any
+
 
 @dataclass
 class Frame:
+    """
+    Developmental frame.
+
+    A frame represents a bounded window of growth.
+    It contains PHASES, not fragments.
+    """
+
     domain: str
     label: str
-    fragments: List[Fragment] = field(default_factory=list)
 
-    def add(self, fragment: Fragment):
-        self.fragments.append(fragment)
+    # Developmental phases occurring in this frame
+    phases: List[Dict[str, Any]] = field(default_factory=list)
 
+    def add_phase(self, phase: Dict[str, Any]) -> None:
+        """
+        Add a developmental phase marker.
+
+        Phase examples:
+        - prebirth_growth
+        - limb_formation
+        - neural_rhythm
+        """
+        self.phases.append(phase)
