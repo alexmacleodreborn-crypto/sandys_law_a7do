@@ -3,47 +3,32 @@ import matplotlib.pyplot as plt
 
 from sandys_law_a7do.bootstrap import (
     open_frame,
+    add_fragment,
     close_frame,
-    add_growth_event,
 )
 from sandys_law_a7do.engine.tick_engine import step_tick
 from sandys_law_a7do.interfaces.chat.observer import render_chat_observer
 
 
 def render_dashboard(state, snapshot):
-    # ---------------------------------
-    # SNAPSHOT
-    # ---------------------------------
     data = snapshot()
     metrics = data["metrics"]
 
     # ---------------------------------
-    # INIT HISTORY
-    # ---------------------------------
-    if "history" not in state:
-        state["history"] = {
-            "ticks": [],
-            "Z": [],
-            "Coherence": [],
-            "Stability": [],
-        }
-
-    # ---------------------------------
     # HEADER
     # ---------------------------------
-    st.title("A7DO — Sandy’s Law Development Dashboard")
+    st.title("A7DO — Prebirth Structural Dashboard")
 
     # ---------------------------------
     # CONTROLS
     # ---------------------------------
-    st.subheader("Controls")
     c1, c2, c3, c4 = st.columns(4)
 
-    if c1.button("🆕 New Development Frame"):
+    if c1.button("🆕 New Growth Frame"):
         open_frame(state)
 
-    if c2.button("🌱 Add Growth Event"):
-        add_growth_event(state, phase=data.get("phase", "prebirth"))
+    if c2.button("➕ Add Growth Phase"):
+        add_fragment(state)
 
     if c3.button("⏹ Close Frame"):
         close_frame(state)
@@ -52,97 +37,73 @@ def render_dashboard(state, snapshot):
         step_tick(state, snapshot)
 
     # ---------------------------------
-    # SYSTEM OVERVIEW
+    # OVERVIEW
     # ---------------------------------
-    birth = data.get("birth")
-    born = birth["born"] if isinstance(birth, dict) else False
-
     st.subheader("System Overview")
     st.json({
-        "tick": data["ticks"],
-        "phase": data.get("phase"),
-        "born": born,
-        "memory_traces": data["memory_count"],
+        "ticks": data["ticks"],
+        "active_frame": str(data["active_frame"]),
+        "born": data.get("birth", {}).get("born", False),
     })
 
     # ---------------------------------
     # METRICS
     # ---------------------------------
     st.subheader("Structural Metrics")
-    m1, m2, m3, m4 = st.columns(4)
-
-    m1.metric("Z (Fragmentation)", round(metrics["Z"], 3))
-    m2.metric("Coherence", round(metrics["Coherence"], 3))
-    m3.metric("Stability", round(metrics["Stability"], 3))
-    m4.metric("Load", round(metrics["Load"], 3))
-
-    # ---------------------------------
-    # RECORD HISTORY
-    # ---------------------------------
-    state["history"]["ticks"].append(data["ticks"])
-    state["history"]["Z"].append(metrics["Z"])
-    state["history"]["Coherence"].append(metrics["Coherence"])
-    state["history"]["Stability"].append(metrics["Stability"])
-
-    # ---------------------------------
-    # METRIC EVOLUTION
-    # ---------------------------------
-    st.subheader("Metric Evolution")
-
-    fig, ax = plt.subplots(figsize=(9, 4))
-    ax.plot(state["history"]["ticks"], state["history"]["Z"], label="Z")
-    ax.plot(state["history"]["ticks"], state["history"]["Coherence"], label="Coherence")
-    ax.plot(state["history"]["ticks"], state["history"]["Stability"], label="Stability")
-    ax.set_ylim(0.0, 1.05)
-    ax.legend()
-    ax.grid(True)
-
+    fig, ax = plt.subplots()
+    ax.bar(metrics.keys(), metrics.values())
     st.pyplot(fig)
 
     # ---------------------------------
-    # EMBODIMENT (READ-ONLY)
+    # EMBODIMENT CANDIDATES
     # ---------------------------------
-    st.subheader("Embodiment Ledger Summary")
-    embodiment = data.get("embodiment")
+    st.subheader("Embodiment Candidates (Prebirth)")
+    candidates = data.get("embodiment_candidates", [])
 
-    if isinstance(embodiment, dict):
-        st.table([{"metric": k, "value": v} for k, v in embodiment.items()])
+    if candidates:
+        st.table(candidates)
     else:
-        st.caption("No embodied invariants yet.")
+        st.caption("No candidates yet — growth still stabilizing.")
 
     # ---------------------------------
-    # PREBIRTH / WOMB
+    # WOMB
     # ---------------------------------
-    st.subheader("Prebirth — Womb State")
-    womb = data.get("womb")
-
-    if isinstance(womb, dict):
-        st.table([{"metric": k, "value": v} for k, v in womb.items()])
+    st.subheader("Womb State")
+    if data.get("womb"):
+        st.json(data["womb"])
     else:
-        st.caption("Womb inactive or birth completed.")
+        st.caption("Womb inactive.")
 
     # ---------------------------------
-    # BIRTH STATE
+    # BIRTH
     # ---------------------------------
     st.subheader("Birth Evaluation")
-
-    if isinstance(birth, dict):
-        st.json(birth)
+    if data.get("birth"):
+        st.json(data["birth"])
     else:
-        st.caption("Birth not yet evaluated.")
+        st.caption("Birth not yet eligible.")
 
     # ---------------------------------
-    # CHAT OBSERVER
+    # MEMORY
+    # ---------------------------------
+    st.subheader("Structural Memory (Read-only)")
+    memory = state.get("memory")
+    if memory and memory.traces:
+        st.table([
+            {
+                "tick": t.tick,
+                "stability": round(t.stability, 3),
+                "frame": t.frame_signature,
+            }
+            for t in memory.traces[-10:]
+        ])
+
+    # ---------------------------------
+    # OBSERVER
     # ---------------------------------
     st.subheader("Observer Console")
     st.text_area(
         "Observer Output",
         render_chat_observer(snapshot),
-        height=220,
+        height=200,
     )
-
-    # ---------------------------------
-    # FINAL STATE
-    # ---------------------------------
-    st.subheader("Final Snapshot")
-    st.json(data)
