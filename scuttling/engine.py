@@ -3,88 +3,65 @@ from __future__ import annotations
 from embodiment.local.candidates import CandidateBuilder
 from sandys_law_a7do.scuttling.coupling.graph import CouplingGraph
 from sandys_law_a7do.scuttling.coupling.region import CoupledRegion
+from genesis.prebirth.phases import phase_for_tick, PrebirthPhase
 
 
 class ScuttlingEngine:
     """
-    Scuttling Engine — Prebirth Embodied Growth
-
-    Responsibilities:
-    - maintain local coupling graph
-    - propagate recovery and load
-    - generate LOCAL embodiment candidates
-
-    This engine:
-    - does NOT perceive
-    - does NOT reason
-    - does NOT consolidate
-    - does NOT know about frames, memory, or preference
+    Prebirth embodied growth engine.
     """
 
     def __init__(self) -> None:
         self.graph = CouplingGraph()
         self.builder = CandidateBuilder()
+        self._support = 0
+        self._candidates = []
+        self._last_phase = None
 
-        self._support_counter = 0
-        self._local_candidates = []
+    def _seed_phase(self, phase: PrebirthPhase) -> None:
+        if phase == PrebirthPhase.NEURAL_PLATE:
+            self.graph.add_region(CoupledRegion("neural_core"))
 
-        self._seed_body()
+        elif phase == PrebirthPhase.CORE:
+            self.graph.add_region(CoupledRegion("core"))
+            self.graph.connect("neural_core", "core")
 
-    # --------------------------------------------------
-    # Initial fetal body seed
-    # --------------------------------------------------
+        elif phase == PrebirthPhase.LIMB_BUDS:
+            self.graph.add_region(CoupledRegion("limb_left"))
+            self.graph.add_region(CoupledRegion("limb_right"))
+            self.graph.connect("core", "limb_left")
+            self.graph.connect("core", "limb_right")
 
-    def _seed_body(self) -> None:
-        """
-        Minimal prebirth structure.
-        This will expand later.
-        """
-        core = CoupledRegion(name="core")
-        limb = CoupledRegion(name="limb")
+        elif phase == PrebirthPhase.LIMB_EXTENSION:
+            self.graph.add_region(CoupledRegion("hand_left"))
+            self.graph.add_region(CoupledRegion("hand_right"))
+            self.graph.connect("limb_left", "hand_left")
+            self.graph.auto = True
+            self.graph.connect("limb_right", "hand_right")
 
-        self.graph.add_region(core)
-        self.graph.add_region(limb)
-        self.graph.connect("core", "limb")
+    def step(self, *, tick: int) -> None:
+        self._support += 1
+        phase = phase_for_tick(tick)
 
-    # --------------------------------------------------
-    # Step (called by bootstrap.tick_system)
-    # --------------------------------------------------
+        if phase != self._last_phase:
+            self._seed_phase(phase)
+            self._last_phase = phase
 
-    def step(self) -> None:
-        """
-        Advance embodied physics by one tick.
-        """
-        self._support_counter += 1
-
-        # Passive recovery across regions
         for region in self.graph.regions.values():
             region.recover(rate=0.01)
 
-        # Snapshot local physics
-        snapshot = self.graph.snapshot()
-
-        # Build LOCAL candidates (no consolidation)
-        self._local_candidates = self.builder.build_from_coupling(
-            snapshot=snapshot,
-            support=self._support_counter,
+        self._candidates = self.builder.build_from_coupling(
+            snapshot=self.graph.snapshot(),
+            support=self._support,
         )
 
-    # --------------------------------------------------
-    # Read-only exposure
-    # --------------------------------------------------
-
     def candidates_snapshot(self):
-        """
-        Safe, read-only view for dashboard / bootstrap.
-        """
         return [
             {
                 "kind": c.kind,
                 "regions": list(c.regions),
-                "conditions": list(c.conditions),
                 "support": c.support,
                 "stability": round(c.stability, 3),
-                "confidence_hint": round(c.confidence_hint, 3),
             }
-            for c in self._local_candidates
+            for c in self._candidates
         ]
