@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sandys_law_a7do.bootstrap import tick_system
+
 
 from sandys_law_a7do.mind.perception import summarize_perception
 from sandys_law_a7do.mind.coherence import compute_coherence
