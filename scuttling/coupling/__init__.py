@@ -1,9 +1,9 @@
 from .region import CoupledRegion
 from .graph import CouplingGraph
-from .propagate import propagate_once
+from .propagate import CouplingPropagator
 
 __all__ = [
     "CoupledRegion",
     "CouplingGraph",
-    "propagate_once",
+    "CouplingPropagator",
 ]
