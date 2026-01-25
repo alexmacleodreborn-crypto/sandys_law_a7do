@@ -13,20 +13,11 @@ def render_dashboard(state, snapshot):
     data = snapshot()
     metrics = data["metrics"]
 
-    # ---------------------------------
-    # STATE INIT
-    # ---------------------------------
-    state.setdefault("history", {"ticks": [], "Z": [], "Coherence": [], "Stability": []})
-    state.setdefault("last_recorded_tick", None)
+    st.title("A7DO — Prebirth System")
 
-    # ---------------------------------
-    # HEADER
-    # ---------------------------------
-    st.title("A7DO — Prebirth / Structural Dashboard")
-
-    # ---------------------------------
-    # CONTROLS
-    # ---------------------------------
+    # --------------------------------------------------
+    # Controls
+    # --------------------------------------------------
     c1, c2, c3, c4 = st.columns(4)
 
     if c1.button("🆕 New Frame"):
@@ -41,71 +32,65 @@ def render_dashboard(state, snapshot):
     if c4.button("⏭ Tick"):
         step_tick(state, snapshot)
 
-    # ---------------------------------
-    # SYSTEM OVERVIEW
-    # ---------------------------------
+    # --------------------------------------------------
+    # Overview
+    # --------------------------------------------------
     st.subheader("System Overview")
     st.json({
         "ticks": data["ticks"],
-        "active_frame": data["active_frame"],
-        "memory_count": data["memory_count"],
+        "active_frame": (
+            f"{data['active_frame'].domain}:{data['active_frame'].label}"
+            if data["active_frame"] else "none"
+        ),
         "born": data["birth"]["born"] if data["birth"] else False,
     })
 
-    # ---------------------------------
-    # METRICS
-    # ---------------------------------
+    # --------------------------------------------------
+    # Metrics
+    # --------------------------------------------------
     st.subheader("Structural Metrics")
-    cols = st.columns(4)
-    cols[0].metric("Z", metrics["Z"])
-    cols[1].metric("Coherence", metrics["Coherence"])
-    cols[2].metric("Stability", metrics["Stability"])
-    cols[3].metric("Load", metrics["Load"])
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Z", round(metrics["Z"], 3))
+    m2.metric("Coherence", round(metrics["Coherence"], 3))
+    m3.metric("Stability", round(metrics["Stability"], 3))
+    m4.metric("Load", round(metrics["Load"], 3))
 
-    # ---------------------------------
-    # HISTORY
-    # ---------------------------------
-    if state["last_recorded_tick"] != data["ticks"]:
-        state["history"]["ticks"].append(data["ticks"])
-        state["history"]["Z"].append(metrics["Z"])
-        state["history"]["Coherence"].append(metrics["Coherence"])
-        state["history"]["Stability"].append(metrics["Stability"])
-        state["last_recorded_tick"] = data["ticks"]
-
-    st.subheader("Metric Evolution")
-    fig, ax = plt.subplots()
-    ax.plot(state["history"]["ticks"], state["history"]["Z"], label="Z")
-    ax.plot(state["history"]["ticks"], state["history"]["Coherence"], label="Coherence")
-    ax.plot(state["history"]["ticks"], state["history"]["Stability"], label="Stability")
-    ax.legend()
-    st.pyplot(fig)
-
-    # ---------------------------------
-    # WOMB
-    # ---------------------------------
-    st.subheader("Prebirth — Womb State")
+    # --------------------------------------------------
+    # Womb
+    # --------------------------------------------------
+    st.subheader("Womb State")
     if data["womb"]:
-        st.table([{"metric": k, "value": v} for k, v in data["womb"].items()])
+        st.json(data["womb"])
     else:
-        st.caption("Womb inactive.")
+        st.caption("Womb inactive")
 
-    # ---------------------------------
-    # BIRTH
-    # ---------------------------------
+    # --------------------------------------------------
+    # Scuttling
+    # --------------------------------------------------
+    st.subheader("Scuttling — Embodied Growth")
+
+    sc = data["scuttling"]
+
+    st.markdown("### Regions")
+    st.json(sc["regions"])
+
+    st.markdown("### Local Embodiment Candidates")
+    if sc["candidates"]:
+        st.table(sc["candidates"])
+    else:
+        st.caption("No candidates yet (early prebirth)")
+
+    # --------------------------------------------------
+    # Birth
+    # --------------------------------------------------
     st.subheader("Birth Evaluation")
     if data["birth"]:
         st.json(data["birth"])
     else:
-        st.caption("Birth not evaluated yet.")
+        st.caption("Birth not yet evaluated")
 
-    # ---------------------------------
-    # EMBODIMENT (INERT)
-    # ---------------------------------
-    st.subheader("Embodiment Ledger (Read-only)")
-    st.table([{"metric": k, "value": v} for k, v in data["embodiment"].items()])
-
-    # ---------------------------------
-    # FINAL SNAPSHOT
-    # ---------------------------------
-    st.subheader("Final Snapshot")
+    # --------------------------------------------------
+    # Final Snapshot
+    # --------------------------------------------------
+    st.subheader("Raw Snapshot")
     st.json(data)
