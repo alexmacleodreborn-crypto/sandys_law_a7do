@@ -93,7 +93,7 @@ def render_dashboard(state, snapshot):
     m3.metric("Stability", round(metrics["Stability"], 3))
 
     # ---------------------------------
-    # RECORD HISTORY (SAFE)
+    # RECORD HISTORY
     # ---------------------------------
     should_record = (
         data["active_frame"] is not None
@@ -148,6 +148,21 @@ def render_dashboard(state, snapshot):
         ])
     else:
         st.caption("No gate data available.")
+
+    # ---------------------------------
+    # EMBODIMENT (READ-ONLY, NEW)
+    # ---------------------------------
+    st.subheader("Embodiment Ledger Summary")
+
+    embodiment = data.get("embodiment")
+
+    if embodiment:
+        st.table([
+            {"metric": k, "value": v}
+            for k, v in embodiment.items()
+        ])
+    else:
+        st.caption("No embodied invariants consolidated yet.")
 
     # ---------------------------------
     # MEMORY TIMELINE
