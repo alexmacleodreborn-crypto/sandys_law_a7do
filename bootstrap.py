@@ -53,7 +53,7 @@ from genesis.birth import BirthEvaluator
 # Scuttling
 # ------------------------------------------------------------
 
-from scuttling.coupling import CouplingGraph, CouplingSignal
+from scuttling.coupling import CouplingGraph
 
 
 # ============================================================
