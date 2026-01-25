@@ -1,6 +1,5 @@
-# sandys_law_a7do/streamlit_app.py
 # =====================================================
-# STREAMLIT ENTRYPOINT (PATH-SAFE, FINAL)
+# STREAMLIT ENTRYPOINT (AUTHORITATIVE)
 # =====================================================
 
 import sys
@@ -17,11 +16,11 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 # -----------------------------------------------------
-# NOW SAFE TO IMPORT PACKAGE
+# SAFE IMPORTS
 # -----------------------------------------------------
 from sandys_law_a7do.bootstrap import build_system
 from sandys_law_a7do.interfaces.dashboard.dashboard_ui import render_dashboard
-from sandys_law_a7do.interfaces.chat.chat_ui import render_chat
+
 # -----------------------------------------------------
 # STREAMLIT CONFIG
 # -----------------------------------------------------
@@ -44,8 +43,4 @@ if "a7do_state" not in st.session_state:
 render_dashboard(
     st.session_state.a7do_state,
     st.session_state.a7do_snapshot,
-)
-
-render_chat(
-    st.session_state.a7do_snapshot
 )
