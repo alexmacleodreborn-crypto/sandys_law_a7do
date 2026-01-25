@@ -1,208 +1,247 @@
-"""
-Bootstrap — Phase 7.4 FINAL (LOCKED)
+# ============================================================
+# A7DO SYSTEM DASHBOARD (READ-ONLY UI)
+#
+# Doctrine:
+# - No cognition
+# - No decisions
+# - No learning
+# - No mutation except via explicit controls
+#
+# This dashboard is an OBSERVER.
+# ============================================================
 
-Responsibilities:
-- Frame lifecycle
-- Tick tracking
-- Memory commit on frame close
-- Gate evaluation at episode boundary
-- Dashboard-safe snapshots
-- Prebirth womb environment (READ-ONLY)
-- Birth evaluation (STRUCTURAL ONLY)
+import streamlit as st
+import matplotlib.pyplot as plt
 
-AUTHORITATIVE FILE
-"""
-
-from __future__ import annotations
-from typing import Any, Callable, Dict, Tuple
-
-from sandys_law_a7do.frames.store import FrameStore
-from sandys_law_a7do.frames.frame import Frame
-
-from sandys_law_a7do.memory.structural_memory import StructuralMemory
-from sandys_law_a7do.memory.trace import MemoryTrace
-
-from sandys_law_a7do.gates.engine import GateEngine
-
-# Embodiment (read-only)
-from embodiment.ledger.ledger import EmbodimentLedger
-from embodiment.bridge.accountant import summarize_embodiment
-
-# Prebirth + Birth
-from genesis.womb.physics import WombPhysicsEngine
-from genesis.birth import BirthEvaluator
+from sandys_law_a7do.bootstrap import (
+    open_frame,
+    add_fragment,
+    close_frame,
+)
+from sandys_law_a7do.engine.tick_engine import step_tick
+from sandys_law_a7do.interfaces.chat.observer import render_chat_observer
 
 
 # ============================================================
-# SYSTEM BUILD
+# MAIN RENDER
 # ============================================================
 
-def build_system() -> Tuple[Callable[[], dict], dict]:
-    state = {
-        "ticks": 0,
+def render_dashboard(state: dict, snapshot) -> None:
+    # --------------------------------------------------------
+    # SNAPSHOT (AUTHORITATIVE READ)
+    # --------------------------------------------------------
+    data = snapshot()
+    metrics = data["metrics"]
 
-        # Core systems
-        "frames": FrameStore(),
-        "memory": StructuralMemory(),
-        "gate_engine": GateEngine(),
-
-        # Embodiment substrate (NO BEHAVIOUR)
-        "embodiment_ledger": EmbodimentLedger(),
-
-        # Prebirth womb (NO AGENCY)
-        "womb_engine": WombPhysicsEngine(),
-        "last_womb_state": None,
-
-        # Birth (STRUCTURAL ONLY)
-        "birth_evaluator": BirthEvaluator(),
-        "birth_state": None,
-
-        # Structural metrics (written elsewhere)
-        "last_coherence": 0.0,
-        "last_fragmentation": 0.0,
-        "structural_load": 0.0,
-        "prediction_error": 0.0,
-    }
-
-    def snapshot() -> dict:
-        return system_snapshot(state)
-
-    return snapshot, state
-
-
-# ============================================================
-# SNAPSHOT (READ-ONLY)
-# ============================================================
-
-def system_snapshot(state: dict) -> dict:
-    frames: FrameStore = state["frames"]
-
-    Z = float(state.get("last_fragmentation", 0.0))
-    coherence = float(state.get("last_coherence", 0.0))
-    load = float(state.get("structural_load", 0.0))
-    stability = coherence * (1.0 - load)
-
-    metrics = {
-        "Z": Z,
-        "Coherence": coherence,
-        "Stability": stability,
-        "Load": load,
-    }
-
-    # Embodiment (read-only)
-    embodiment_view = summarize_embodiment(state["embodiment_ledger"])
-
-    # Womb (read-only)
-    womb_view = None
-    if state["last_womb_state"] is not None:
-        w = state["last_womb_state"]
-        womb_view = {
-            "tick": w.tick,
-            "heartbeat_rate": w.heartbeat_rate,
-            "ambient_load": w.ambient_load,
-            "rhythmic_stability": w.rhythmic_stability,
-            "womb_active": w.womb_active,
+    # --------------------------------------------------------
+    # INIT HISTORY (ONCE)
+    # --------------------------------------------------------
+    if "history" not in state:
+        state["history"] = {
+            "ticks": [],
+            "Z": [],
+            "Coherence": [],
+            "Stability": [],
+            "Load": [],
         }
 
-    # Birth (read-only)
-    birth_view = None
-    if state["birth_state"] is not None:
-        b = state["birth_state"]
-        birth_view = {
-            "born": b.born,
-            "reason": b.reason,
-            "tick": b.tick,
+    if "last_recorded_tick" not in state:
+        state["last_recorded_tick"] = None
+
+    # --------------------------------------------------------
+    # HEADER
+    # --------------------------------------------------------
+    st.title("A7DO — Sandy’s Law System Observer")
+
+    # ========================================================
+    # CONTROLS (STRUCTURAL ONLY)
+    # ========================================================
+    st.subheader("Structural Controls")
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    if c1.button("🆕 Open Frame"):
+        open_frame(state)
+
+    if c2.button("➕ Add Phase Signal"):
+        # Phase signals are still fragments structurally
+        add_fragment(state, kind="phase_signal")
+
+    if c3.button("⏹ Close Frame"):
+        close_frame(state)
+
+    if c4.button("⏭ Tick"):
+        step_tick(state, snapshot)
+
+    # --------------------------------------------------------
+    # SNAPSHOT AFTER CONTROLS
+    # --------------------------------------------------------
+    data = snapshot()
+    metrics = data["metrics"]
+
+    # ========================================================
+    # SYSTEM OVERVIEW
+    # ========================================================
+    st.subheader("System Overview")
+
+    st.json(
+        {
+            "ticks": data["ticks"],
+            "active_frame": (
+                f"{data['active_frame'].domain}:{data['active_frame'].label}"
+                if data["active_frame"]
+                else "none"
+            ),
+            "memory_count": data["memory_count"],
+            "born": data.get("birth", {}).get("born") if data.get("birth") else False,
         }
+    )
 
-    return {
-        "ticks": int(state["ticks"]),
-        "metrics": metrics,
-        "active_frame": frames.active,
-        "memory_count": int(state["memory"].count()),
-        "prediction_error": float(state.get("prediction_error", 0.0)),
-        "embodiment": embodiment_view,
-        "womb": womb_view,
-        "birth": birth_view,
-    }
+    # ========================================================
+    # STRUCTURAL METRICS
+    # ========================================================
+    st.subheader("Structural Metrics")
 
+    m1, m2, m3, m4 = st.columns(4)
 
-# ============================================================
-# FRAME OPERATIONS
-# ============================================================
+    m1.metric("Fragmentation (Z)", round(metrics["Z"], 3))
+    m2.metric("Coherence", round(metrics["Coherence"], 3))
+    m3.metric("Stability", round(metrics["Stability"], 3))
+    m4.metric("Load", round(metrics["Load"], 3))
 
-def open_frame(state: dict, *, domain: str = "development", label: str = "prebirth") -> None:
-    frames: FrameStore = state["frames"]
-    if frames.active is None:
-        frames.open(Frame(domain=domain, label=label))
+    # --------------------------------------------------------
+    # RECORD HISTORY (MONOTONIC)
+    # --------------------------------------------------------
+    tick = data["ticks"]
+    if state["last_recorded_tick"] != tick:
+        state["history"]["ticks"].append(tick)
+        state["history"]["Z"].append(metrics["Z"])
+        state["history"]["Coherence"].append(metrics["Coherence"])
+        state["history"]["Stability"].append(metrics["Stability"])
+        state["history"]["Load"].append(metrics["Load"])
+        state["last_recorded_tick"] = tick
 
+    # ========================================================
+    # METRIC EVOLUTION
+    # ========================================================
+    st.subheader("Metric Evolution")
 
-def add_phase(state: dict, *, phase: str = "prebirth_growth") -> None:
-    """
-    Add a developmental phase to the active frame.
-    """
-    frames: FrameStore = state["frames"]
-    frame = frames.active
-    if frame is None:
-        return
+    fig, ax = plt.subplots(figsize=(9, 4))
 
-    frame.add_phase({
-        "phase": phase,
-        "tick": state["ticks"],
-    })
+    ax.plot(state["history"]["ticks"], state["history"]["Z"], label="Z", color="red")
+    ax.plot(state["history"]["ticks"], state["history"]["Coherence"], label="Coherence", color="blue")
+    ax.plot(state["history"]["ticks"], state["history"]["Stability"], label="Stability", color="green")
+    ax.plot(state["history"]["ticks"], state["history"]["Load"], label="Load", color="orange")
 
+    ax.set_xlabel("Tick")
+    ax.set_ylabel("Value")
+    ax.set_ylim(0.0, 1.05)
+    ax.legend()
+    ax.grid(True)
 
-def close_frame(state: dict) -> None:
-    frames: FrameStore = state["frames"]
-    frame = frames.active
-    if frame is None:
-        return
+    st.pyplot(fig)
 
-    # Memory commit (structural only)
-    stability = state["last_coherence"] * (1.0 - state["structural_load"])
+    # ========================================================
+    # GATES (READ-ONLY)
+    # ========================================================
+    st.subheader("Gates")
 
-    try:
-        state["memory"].add_trace(
-            MemoryTrace(
-                state["ticks"],
-                state["last_fragmentation"],
-                state["last_coherence"],
-                stability,
-                f"{frame.domain}:{frame.label}",
-                1.0,
-                ["episode"],
-            )
-        )
-    except Exception:
-        pass
+    gates = data.get("gates", {})
 
-    frames.close()
+    if gates:
+        st.table([
+            {
+                "gate": name,
+                "state": info.get("state"),
+                "open": info.get("open"),
+                "reason": info.get("reason"),
+                "last_tick": info.get("last_tick"),
+            }
+            for name, info in gates.items()
+        ])
+    else:
+        st.caption("No gate data available.")
 
+    # ========================================================
+    # EMBODIMENT (READ-ONLY)
+    # ========================================================
+    st.subheader("Embodiment Ledger Summary")
 
-# ============================================================
-# TICK (TIME + WOMB + BIRTH)
-# ============================================================
+    embodiment = data.get("embodiment")
 
-def tick_system(state: dict) -> None:
-    state["ticks"] += 1
-    tick = state["ticks"]
+    if embodiment:
+        st.table([
+            {"metric": k, "value": v}
+            for k, v in embodiment.items()
+        ])
+    else:
+        st.caption("No embodied invariants consolidated.")
 
-    # Womb physics
-    state["last_womb_state"] = state["womb_engine"].step()
+    # ========================================================
+    # PREBIRTH / WOMB
+    # ========================================================
+    st.subheader("Prebirth — Womb State")
 
-    # Structural load
-    frames: FrameStore = state["frames"]
-    load = state["structural_load"]
-    load = load + 0.05 if frames.active else load * 0.6
-    state["structural_load"] = max(0.0, min(1.0, load))
+    womb = data.get("womb")
 
-    # Birth evaluation
-    if state["birth_state"] is None:
-        metrics = {
-            "Stability": state["last_coherence"] * (1.0 - state["structural_load"]),
-            "Load": state["structural_load"],
-            "Z": state["last_fragmentation"],
-        }
-        state["birth_state"] = state["birth_evaluator"].evaluate(
-            tick=tick,
-            metrics=metrics,
-        )
+    if womb:
+        st.table([
+            {"metric": k, "value": v}
+            for k, v in womb.items()
+        ])
+    else:
+        st.caption("Womb inactive or birth completed.")
+
+    # ========================================================
+    # BIRTH STATE
+    # ========================================================
+    st.subheader("Birth Evaluation")
+
+    birth = data.get("birth")
+
+    if birth:
+        st.json(birth)
+    else:
+        st.caption("Birth not yet evaluated.")
+
+    # ========================================================
+    # MEMORY (STRUCTURAL TRACE)
+    # ========================================================
+    st.subheader("Memory Timeline (Recent)")
+
+    memory = state.get("memory")
+
+    if memory and hasattr(memory, "traces") and memory.traces:
+        recent = memory.traces[-10:]
+        st.table([
+            {
+                "tick": t.tick,
+                "Z": round(t.Z, 3),
+                "coherence": round(t.coherence, 3),
+                "stability": round(t.stability, 3),
+                "frame": t.frame_signature,
+                "tags": ", ".join(t.tags),
+            }
+            for t in recent
+        ])
+    else:
+        st.caption("No memory traces recorded.")
+
+    # ========================================================
+    # OBSERVER CONSOLE (LANGUAGE SURFACE)
+    # ========================================================
+    st.subheader("Observer Console")
+
+    observer_text = render_chat_observer(snapshot)
+
+    st.text_area(
+        label="A7DO Observer Output",
+        value=observer_text,
+        height=240,
+    )
+
+    # ========================================================
+    # FINAL SNAPSHOT
+    # ========================================================
+    st.subheader("Final System Snapshot")
+    st.json(data)
