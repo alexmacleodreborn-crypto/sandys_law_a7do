@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class ThermalPainSignal:
+class ThermalPain:
     """
     Represents thermal stress or damage.
     """
