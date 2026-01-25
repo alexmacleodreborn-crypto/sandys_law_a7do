@@ -1,3 +1,5 @@
+# sandys_law_a7do/bootstrap.py
+
 """
 Bootstrap — Phase 7.4 FINAL (LOCKED)
 
@@ -22,6 +24,10 @@ from sandys_law_a7do.memory.structural_memory import StructuralMemory
 from sandys_law_a7do.memory.trace import MemoryTrace
 
 from sandys_law_a7do.gates.engine import GateEngine
+
+# NEW — embodiment (read-only)
+from embodiment.ledger.ledger import EmbodimentLedger
+from embodiment.bridge.accountant import summarize_embodiment
 
 
 # ============================================================
@@ -58,6 +64,9 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "frames": FrameStore(),
         "memory": StructuralMemory(),
         "gate_engine": GateEngine(),
+
+        # NEW — embodiment substrate (no behaviour)
+        "embodiment_ledger": EmbodimentLedger(),
 
         # structural metrics (written elsewhere)
         "last_coherence": 0.0,
@@ -101,6 +110,12 @@ def system_snapshot(state: dict) -> dict:
         for name, gs in gates.items():
             gate_view[str(name)] = _normalize_gate(gs)
 
+    # OPTIONAL — read-only embodiment summary
+    embodiment_view = None
+    ledger = state.get("embodiment_ledger")
+    if ledger is not None:
+        embodiment_view = summarize_embodiment(ledger)
+
     return {
         "ticks": int(state["ticks"]),
         "metrics": metrics,
@@ -108,6 +123,7 @@ def system_snapshot(state: dict) -> dict:
         "memory_count": int(memory.count()),
         "prediction_error": float(state.get("prediction_error", 0.0)),
         "gates": gate_view,
+        "embodiment": embodiment_view,  # visible, inert
     }
 
 
@@ -136,44 +152,32 @@ def close_frame(state: dict) -> None:
     if frame is None:
         return
 
-    # -----------------------------
-    # STRUCTURAL READOUT
-    # -----------------------------
     Z = float(state.get("last_fragmentation", 0.0))
     coherence = float(state.get("last_coherence", 0.0))
     load = float(state.get("structural_load", 0.0))
     stability = coherence * (1.0 - load)
 
-    # -----------------------------
-    # MEMORY COMMIT (POSITIONAL — SAFE)
-    # -----------------------------
     try:
-        trace = MemoryTrace(
-            state["ticks"],
-            Z,
-            coherence,
-            stability,
-            f"{frame.domain}:{frame.label}",
-            1.0,
-            ["episode", "stable"] if stability >= 0.7 else ["episode", "unstable"],
+        memory.add_trace(
+            MemoryTrace(
+                state["ticks"],
+                Z,
+                coherence,
+                stability,
+                f"{frame.domain}:{frame.label}",
+                1.0,
+                ["episode", "stable"] if stability >= 0.7 else ["episode", "unstable"],
+            )
         )
-        memory.add_trace(trace)
     except Exception:
-        # Memory failure must NEVER kill runtime
         pass
 
-    # -----------------------------
-    # GATE EVALUATION (SIGNATURE SAFE)
-    # -----------------------------
     if gate_engine:
         try:
             gate_engine.evaluate(coherence, Z, load)
         except Exception:
             pass
 
-    # -----------------------------
-    # PRESSURE RELEASE
-    # -----------------------------
     state["structural_load"] *= 0.6
     frames.close()
 
