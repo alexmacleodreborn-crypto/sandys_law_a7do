@@ -3,11 +3,12 @@ Bootstrap — Phase 7.4 FINAL (LOCKED)
 
 Responsibilities:
 - Frame lifecycle
-- Tick tracking (authoritative)
-- Prebirth womb physics
-- Scuttling (local growth)
-- Birth evaluation (structural only)
-- Read-only snapshots for dashboard
+- Tick tracking
+- Memory commit on frame close
+- Gate evaluation at episode boundary
+- Dashboard-safe snapshots
+- Prebirth womb environment (READ-ONLY)
+- Birth evaluation (STRUCTURAL ONLY)
 """
 
 from __future__ import annotations
@@ -21,28 +22,13 @@ from sandys_law_a7do.memory.structural_memory import StructuralMemory
 from sandys_law_a7do.memory.trace import MemoryTrace
 from sandys_law_a7do.gates.engine import GateEngine
 
-# Embodiment (INERT until birth)
+# Embodiment (read-only)
 from embodiment.ledger.ledger import EmbodimentLedger
 from embodiment.bridge.accountant import summarize_embodiment
 
-# Genesis
+# Prebirth + Birth
 from genesis.womb.physics import WombPhysicsEngine
 from genesis.birth import BirthEvaluator
-
-# Scuttling (LOCAL growth)
-from sandys_law_a7do.scuttling.engine import ScuttlingEngine
-
-
-# ============================================================
-# SAFE ACCESS
-# ============================================================
-
-def _get(obj: Any, key: str, default=None):
-    if obj is None:
-        return default
-    if isinstance(obj, dict):
-        return obj.get(key, default)
-    return getattr(obj, key, default)
 
 
 # ============================================================
@@ -54,26 +40,26 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         # time
         "ticks": 0,
 
-        # core runtime
+        # core systems
         "frames": FrameStore(),
         "memory": StructuralMemory(),
         "gate_engine": GateEngine(),
 
-        # embodiment (EMPTY until birth)
+        # embodiment substrate (NO BEHAVIOUR)
         "embodiment_ledger": EmbodimentLedger(),
 
-        # genesis
+        # prebirth womb
         "womb_engine": WombPhysicsEngine(),
         "last_womb_state": None,
 
-        # scuttling (ACTIVE prebirth)
-        "scuttling_engine": ScuttlingEngine(),
-
-        # birth
+        # birth (STRUCTURAL ONLY)
         "birth_evaluator": BirthEvaluator(),
         "birth_state": None,
 
-        # structural channels
+        # development phase
+        "current_phase": "prebirth",
+
+        # structural metrics
         "last_coherence": 0.0,
         "last_fragmentation": 0.0,
         "structural_load": 0.0,
@@ -94,8 +80,8 @@ def system_snapshot(state: dict) -> dict:
     frames: FrameStore = state["frames"]
     memory: StructuralMemory = state["memory"]
 
-    Z = float(state.get("last_fragmentation", 0.0))
     coherence = float(state.get("last_coherence", 0.0))
+    Z = float(state.get("last_fragmentation", 0.0))
     load = float(state.get("structural_load", 0.0))
     stability = coherence * (1.0 - load)
 
@@ -106,23 +92,8 @@ def system_snapshot(state: dict) -> dict:
         "Load": load,
     }
 
-    # -----------------------------
-    # Embodiment (empty prebirth)
-    # -----------------------------
-    embodiment_view = summarize_embodiment(
-        state["embodiment_ledger"]
-    )
+    embodiment_view = summarize_embodiment(state["embodiment_ledger"])
 
-    # -----------------------------
-    # Local embodiment (PREBIRTH)
-    # -----------------------------
-    local_embodiment = None
-    if state.get("birth_state") is None:
-        local_embodiment = state["scuttling_engine"].candidates_snapshot()
-
-    # -----------------------------
-    # Womb
-    # -----------------------------
     womb_view = None
     if state.get("last_womb_state"):
         ws = state["last_womb_state"]
@@ -134,9 +105,6 @@ def system_snapshot(state: dict) -> dict:
             "womb_active": ws.womb_active,
         }
 
-    # -----------------------------
-    # Birth
-    # -----------------------------
     birth_view = None
     if state.get("birth_state"):
         bs = state["birth_state"]
@@ -151,13 +119,10 @@ def system_snapshot(state: dict) -> dict:
         "metrics": metrics,
         "active_frame": frames.active,
         "memory_count": memory.count(),
-        "prediction_error": state.get("prediction_error", 0.0),
-
+        "embodiment": embodiment_view,
         "womb": womb_view,
         "birth": birth_view,
-
-        "local_embodiment": local_embodiment,
-        "embodiment": embodiment_view,
+        "phase": state["current_phase"],
     }
 
 
@@ -165,77 +130,86 @@ def system_snapshot(state: dict) -> dict:
 # FRAME OPERATIONS
 # ============================================================
 
-def open_frame(state: dict, *, domain="demo", label="ui") -> None:
-    if state["frames"].active is None:
-        state["frames"].open(Frame(domain=domain, label=label))
+def open_frame(state: dict, *, domain: str = "development", label: str | None = None) -> None:
+    frames: FrameStore = state["frames"]
+    if frames.active is None:
+        label = label or state.get("current_phase", "prebirth")
+        frames.open(Frame(domain=domain, label=label))
 
 
-def add_fragment(state: dict, *, kind="phase", payload=None) -> None:
-    if state["frames"].active:
-        state["frames"].active.add(
-            Fragment(kind=kind, payload=payload or {})
-        )
-
-
-def close_frame(state: dict) -> None:
-    frames = state["frames"]
+def add_growth_event(state: dict, *, phase: str) -> None:
+    """
+    Add a STRUCTURAL growth impulse.
+    """
+    frames: FrameStore = state["frames"]
     if not frames.active:
         return
 
-    Z = state["last_fragmentation"]
-    coherence = state["last_coherence"]
-    load = state["structural_load"]
+    fragment = Fragment(
+        kind="growth",
+        payload={
+            "phase": phase,
+            "tick": state["ticks"],
+        },
+    )
+    frames.add_fragment(fragment)
+
+
+def close_frame(state: dict) -> None:
+    frames: FrameStore = state["frames"]
+    memory: StructuralMemory = state["memory"]
+
+    frame = frames.active
+    if not frame:
+        return
+
+    coherence = state.get("last_coherence", 0.0)
+    Z = state.get("last_fragmentation", 0.0)
+    load = state.get("structural_load", 0.0)
     stability = coherence * (1.0 - load)
 
-    try:
-        state["memory"].add_trace(
-            MemoryTrace(
-                state["ticks"],
-                Z,
-                coherence,
-                stability,
-                f"{frames.active.domain}:{frames.active.label}",
-                1.0,
-                ["episode"],
-            )
+    memory.add_trace(
+        MemoryTrace(
+            tick=state["ticks"],
+            Z=Z,
+            coherence=coherence,
+            stability=stability,
+            frame_signature=f"{frame.domain}:{frame.label}",
+            weight=1.0,
+            tags=["development", state["current_phase"]],
         )
-    except Exception:
-        pass
+    )
 
-    state["structural_load"] *= 0.6
     frames.close()
 
 
 # ============================================================
-# TICK — AUTHORITATIVE
+# TICK (TIME + WOMB + BIRTH)
 # ============================================================
 
 def tick_system(state: dict) -> None:
     state["ticks"] += 1
-    tick = state["ticks"]
 
     # womb physics
     state["last_womb_state"] = state["womb_engine"].step()
 
-    # scuttling (ONLY if not born)
-    if state.get("birth_state") is None:
-        state["scuttling_engine"].step()
-
     # structural load
-    if state["frames"].active:
+    frames: FrameStore = state["frames"]
+    if frames.active:
         state["structural_load"] = min(1.0, state["structural_load"] + 0.05)
     else:
         state["structural_load"] *= 0.6
 
     # birth evaluation
     if state["birth_state"] is None:
-        evaluator = state["birth_evaluator"]
+        evaluator: BirthEvaluator = state["birth_evaluator"]
         metrics = {
-            "Stability": state["last_coherence"] * (1.0 - state["structural_load"]),
-            "Load": state["structural_load"],
-            "Z": state["last_fragmentation"],
+            "Stability": state.get("last_coherence", 0.0)
+            * (1.0 - state.get("structural_load", 0.0)),
+            "Load": state.get("structural_load", 1.0),
+            "Z": state.get("last_fragmentation", 1.0),
         }
-        state["birth_state"] = evaluator.evaluate(
-            tick=tick,
-            metrics=metrics,
-        )
+        bs = evaluator.evaluate(tick=state["ticks"], metrics=metrics)
+        state["birth_state"] = bs
+        if bs.born:
+            state["current_phase"] = "postbirth"
