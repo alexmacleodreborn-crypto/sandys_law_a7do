@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from sandys_law_a7do.bootstrap import tick_system
+
 from sandys_law_a7do.mind.perception import summarize_perception
 from sandys_law_a7do.mind.coherence import compute_coherence
 from sandys_law_a7do.mind.regulation import regulate
@@ -14,21 +16,26 @@ from sandys_law_a7do.mind.preference import (
 
 def step_tick(state, snapshot):
     """
-    Phase 6.3 — Tick writes last_* structural channels (for attention loop)
+    Phase 7.4 — Cognitive Tick (Clock Delegated)
 
-    - No reward
+    - Time advancement delegated to bootstrap.tick_system
+    - Womb physics stepped BEFORE cognition
     - No action selection
-    - No memory commit here (Option A stays in close_frame)
+    - No reward
+    - No semantic memory
     """
 
-    # ---------------------------------
-    # ADVANCE TIME
-    # ---------------------------------
-    state["ticks"] += 1
+    # =========================================================
+    # AUTHORITATIVE TIME + WOMB STEP
+    # =========================================================
+    tick_system(state)
 
-    # Ensure preference engine/store exist (safe)
+    # =========================================================
+    # ENSURE PREFERENCE ENGINE EXISTS (SAFE)
+    # =========================================================
     if "preference_store" not in state:
         state["preference_store"] = PreferenceStore()
+
     if "preference_engine" not in state:
         state["preference_engine"] = PreferenceEngine(
             store=state["preference_store"],
@@ -40,9 +47,9 @@ def step_tick(state, snapshot):
     frames = state["frames"]
     frame = frames.active
 
-    # ---------------------------------
+    # =========================================================
     # PERCEPTION (ONLY IF FRAME ACTIVE)
-    # ---------------------------------
+    # =========================================================
     if frame:
         fragments = [{"action": f.kind} for f in frame.fragments]
         percept = summarize_perception(fragments)
@@ -54,9 +61,9 @@ def step_tick(state, snapshot):
         unique_actions = 0
         percept_notes = ["empty"]
 
-    # ---------------------------------
-    # STRUCTURAL PREDICTION ERROR (L1 proxy)
-    # ---------------------------------
+    # =========================================================
+    # STRUCTURAL PREDICTION ERROR (L1 PROXY)
+    # =========================================================
     last = state.get("last_percept")
     if last:
         pe_frag = abs(fragment_count - last.get("fragment_count", 0))
@@ -70,11 +77,12 @@ def step_tick(state, snapshot):
         "unique_actions": unique_actions,
         "notes": percept_notes,
     }
+
     state["prediction_error"] = float(prediction_error)
 
-    # ---------------------------------
-    # METRICS (STRUCTURAL ONLY)
-    # ---------------------------------
+    # =========================================================
+    # STRUCTURAL METRICS
+    # =========================================================
     report = compute_coherence(
         fragment_count=fragment_count,
         unique_actions=unique_actions,
@@ -85,30 +93,29 @@ def step_tick(state, snapshot):
     coherence = float(report.coherence)
     block_rate = float(report.block_rate)
 
-    # IMPORTANT: bootstrap snapshot uses structural_load for stability.
     load = float(state.get("structural_load", 0.0))
     stability = coherence * (1.0 - load)
 
-    # ---------------------------------
+    # =========================================================
     # REGULATION (READ-ONLY)
-    # ---------------------------------
+    # =========================================================
     regulate(
         coherence=coherence,
         fragmentation=Z,
         block_rate=block_rate,
     )
 
-    # ---------------------------------
-    # Phase 6.3 — WRITE LAST_* CHANNELS FOR ATTENTION LOOP
-    # ---------------------------------
+    # =========================================================
+    # WRITE STRUCTURAL CHANNELS (FOR SNAPSHOT / BIRTH)
+    # =========================================================
     state["last_coherence"] = float(coherence)
     state["last_fragmentation"] = float(Z)
     state["last_block_rate"] = float(block_rate)
     state["last_percept_notes"] = list(percept_notes)
 
-    # ---------------------------------
-    # PREFERENCE UPDATE (READ-ONLY BIAS)
-    # ---------------------------------
+    # =========================================================
+    # PREFERENCE UPDATE (STRUCTURAL BIAS ONLY)
+    # =========================================================
     context_key = pref_engine.context_key_from_accounting(
         coherence=coherence,
         fragmentation=Z,
@@ -134,10 +141,9 @@ def step_tick(state, snapshot):
         "prediction_error": float(prediction_error),
     }
 
-    # ---------------------------------
-    # ATTENTION SURFACE CHANNEL (from active frame fragments if present)
-    # ---------------------------------
-    # Attention is stored on fragments (payload). If no frame, keep last.
+    # =========================================================
+    # ATTENTION SURFACE CHANNEL
+    # =========================================================
     if frame and frame.fragments:
         last_frag = frame.fragments[-1]
         try:
