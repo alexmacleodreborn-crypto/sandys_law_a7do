@@ -1,3 +1,5 @@
+# accountant/accountant.py
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -55,6 +57,11 @@ class AccountantEntry:
     # Notes (machine-readable tags)
     notes: List[str] = field(default_factory=list)
 
+    # --------------------------------------------------------
+    # NEW: Read-only embodiment context (no authority)
+    # --------------------------------------------------------
+    embodiment: Optional[Dict[str, float]] = None
+
 
 class Accountant:
     """
@@ -63,6 +70,7 @@ class Accountant:
     Input:
       - a bounded list of WorldEvents (chronological)
       - optional prediction error result
+      - optional embodiment summary (read-only)
 
     Output:
       - AccountantEntry
@@ -80,6 +88,7 @@ class Accountant:
         *,
         frames: List[List[WorldEvent]],
         prediction_error: Optional[PredictionErrorResult] = None,
+        embodiment: Optional[Dict[str, float]] = None,
     ) -> AccountantEntry:
         """
         Summarize a set of frames.
@@ -133,10 +142,7 @@ class Accountant:
         # Fragmentation & coherence
         # ----------------------------------------------------
 
-        # Fragmentation: many events per frame = high entropy
         fragmentation = self._clip01(event_count / max(1, frame_count * 8))
-
-        # Coherence: outcomes linked to actions
         coherence = self._clip01(linked_outcomes / max(1, out))
 
         notes: List[str] = []
@@ -150,10 +156,7 @@ class Accountant:
         if block_rate > 0.7:
             notes.append("persistent_blocking")
 
-        if prediction_error is not None:
-            pe = prediction_error.error_l1
-        else:
-            pe = None
+        pe = prediction_error.error_l1 if prediction_error else None
 
         return AccountantEntry(
             frame_count=frame_count,
@@ -169,6 +172,7 @@ class Accountant:
             coherence=coherence,
             prediction_error_l1=pe,
             notes=notes,
+            embodiment=embodiment,  # <-- pass-through only
         )
 
     # --------------------------------------------------------
