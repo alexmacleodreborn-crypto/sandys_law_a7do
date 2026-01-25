@@ -1,56 +1,86 @@
+from __future__ import annotations
+
+from embodiment.local.candidates import CandidateBuilder
 from sandys_law_a7do.scuttling.coupling.graph import CouplingGraph
-from sandys_law_a7do.scuttling.local.candidates import LocalEmbodimentCandidates
+from sandys_law_a7do.scuttling.coupling.region import CoupledRegion
 
 
 class ScuttlingEngine:
     """
-    Prebirth scuttling + local embodiment formation.
+    Scuttling Engine — Prebirth Structural Growth
 
-    NO agency
-    NO choice
-    NO ownership
+    Responsibilities:
+    - maintain coupling graph
+    - propagate load / stability
+    - generate LOCAL embodiment candidates
+
+    This engine:
+    - does NOT consolidate
+    - does NOT touch embodiment ledger
+    - does NOT gate
     """
 
     def __init__(self) -> None:
         self.graph = CouplingGraph()
-        self.candidates = LocalEmbodimentCandidates()
-        self._initialized = False
+        self.builder = CandidateBuilder()
+        self._support_counter = 0
+        self._local_candidates = []
 
-    def _init_body(self) -> None:
-        from scuttling.coupling.region import CoupledRegion
+        # --------------------------------------------------
+        # INITIAL BODY SEED (PREBIRTH)
+        # --------------------------------------------------
+        self._seed_body()
 
-        for name in ["core", "left_limb", "right_limb", "head"]:
-            self.graph.add_region(CoupledRegion(name=name))
+    # --------------------------------------------------
+    # Body seed (minimal fetus-like structure)
+    # --------------------------------------------------
 
-        self.graph.connect("core", "left_limb")
-        self.graph.connect("core", "right_limb")
-        self.graph.connect("core", "head")
+    def _seed_body(self) -> None:
+        core = CoupledRegion(name="core")
+        limb = CoupledRegion(name="limb")
 
-        self._initialized = True
+        self.graph.add_region(core)
+        self.graph.add_region(limb)
+        self.graph.connect("core", "limb")
+
+    # --------------------------------------------------
+    # Step (called every tick before birth)
+    # --------------------------------------------------
 
     def step(self) -> None:
-        if not self._initialized:
-            self._init_body()
+        """
+        Advance local embodied growth.
+        """
+        self._support_counter += 1
 
-        # passive growth
-        for r in self.graph.regions.values():
-            r.local_state.apply_load(0.02)
-            r.local_state.recover(0.01)
+        # Passive stabilization
+        for region in self.graph.regions.values():
+            region.recover(rate=0.01)
 
-        # candidate detection
-        snapshot = {
-            name: {
-                "load": r.local_state.load,
-                "pain": 1.0 - r.local_state.integrity,
-                "stability": r.local_state.stability,
-            }
-            for name, r in self.graph.regions.items()
-        }
+        # Build local candidates
+        snapshot = self.graph.snapshot()
 
-        self.candidates.ingest_coupling_snapshot(
+        self._local_candidates = self.builder.build_from_coupling(
             snapshot=snapshot,
-            support=1,
+            support=self._support_counter,
         )
 
-    def candidates_snapshot(self) -> list:
-        return self.candidates.snapshot()
+    # --------------------------------------------------
+    # Read-only exposure
+    # --------------------------------------------------
+
+    def candidates_snapshot(self):
+        """
+        Safe, read-only view for dashboard / bootstrap.
+        """
+        return [
+            {
+                "kind": c.kind,
+                "regions": list(c.regions),
+                "conditions": list(c.conditions),
+                "support": c.support,
+                "stability": round(c.stability, 3),
+                "confidence_hint": round(c.confidence_hint, 3),
+            }
+            for c in self._local_candidates
+        ]
