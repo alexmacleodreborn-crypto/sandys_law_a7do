@@ -1,38 +1,85 @@
+"""
+A7DO Bootstrap — Authoritative System Constructor
+
+Responsibilities:
+- Construct system state
+- Own time progression
+- Expose snapshot() for UI
+- Coordinate prebirth, scuttling, embodiment, cognition
+"""
+
 from __future__ import annotations
 from typing import Callable, Dict, Any, Tuple
 
+# -------------------------
+# Core systems
+# -------------------------
 from sandys_law_a7do.frames.store import FrameStore
-from sandys_law_a7do.frames.frame import Frame
+from sandys_law_a7do.memory.structural_memory import StructuralMemory
+from sandys_law_a7do.gates.engine import GateEngine
 
+# -------------------------
+# Genesis / embodiment
+# -------------------------
 from sandys_law_a7do.scuttling.engine import ScuttlingEngine
 from genesis.womb.physics import WombPhysicsEngine
 from genesis.birth import BirthEvaluator
 
+from embodiment.ledger.ledger import EmbodimentLedger
+from embodiment.bridge.accountant import summarize_embodiment
+
 
 # ============================================================
-# SYSTEM BUILD
+# SYSTEM CONSTRUCTOR
 # ============================================================
 
 def build_system() -> Tuple[Callable[[], dict], dict]:
-    state = {
-        # time
-        "tick": 0,
+    """
+    Construct the full A7DO system.
 
-        # core
+    Returns:
+        snapshot() -> dict
+        state -> mutable system state
+    """
+
+    state: Dict[str, Any] = {
+        # -----------------
+        # Time
+        # -----------------
+        "ticks": 0,
+
+        # -----------------
+        # Core runtime
+        # -----------------
         "frames": FrameStore(),
+        "memory": StructuralMemory(),
+        "gate_engine": GateEngine(),
 
-        # prebirth systems
-        "womb": WombPhysicsEngine(),
-        "scuttling": ScuttlingEngine(),
+        # -----------------
+        # Prebirth & embodiment
+        # -----------------
+        "womb_engine": WombPhysicsEngine(),
+        "scuttling_engine": ScuttlingEngine(),
+        "embodiment_ledger": EmbodimentLedger(),
 
-        # birth
+        # -----------------
+        # Birth
+        # -----------------
         "birth_evaluator": BirthEvaluator(),
         "birth_state": None,
 
-        # structural channels
-        "last_stability": 0.0,
-        "last_load": 0.0,
+        # -----------------
+        # Structural channels (written by tick)
+        # -----------------
+        "last_coherence": 0.0,
         "last_fragmentation": 0.0,
+        "structural_load": 0.0,
+        "prediction_error": 0.0,
+
+        # -----------------
+        # Cached views
+        # -----------------
+        "last_womb_state": None,
     }
 
     def snapshot() -> dict:
@@ -46,30 +93,69 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
 # ============================================================
 
 def system_snapshot(state: dict) -> dict:
-    womb_state = state.get("womb_state")
-    birth = state.get("birth_state")
+    frames = state["frames"]
+
+    coherence = float(state.get("last_coherence", 0.0))
+    Z = float(state.get("last_fragmentation", 0.0))
+    load = float(state.get("structural_load", 0.0))
+    stability = coherence * (1.0 - load)
+
+    # Gates
+    gates = {}
+    ge = state.get("gate_engine")
+    if ge:
+        try:
+            snap = ge.snapshot()
+            for name, g in (snap.get("gates") or {}).items():
+                gates[name] = {
+                    "state": getattr(g, "state", None),
+                    "open": getattr(g, "open", None),
+                    "reason": getattr(g, "reason", None),
+                    "last_tick": getattr(g, "last_tick", None),
+                }
+        except Exception:
+            pass
+
+    # Embodiment summary
+    embodiment = None
+    try:
+        embodiment = summarize_embodiment(state["embodiment_ledger"])
+    except Exception:
+        pass
+
+    # Womb
+    womb = None
+    ws = state.get("last_womb_state")
+    if ws:
+        womb = {
+            "heartbeat_rate": ws.heartbeat_rate,
+            "ambient_load": ws.ambient_load,
+            "rhythmic_stability": ws.rhythmic_stability,
+            "womb_active": ws.womb_active,
+        }
 
     return {
-        "tick": state["tick"],
-
-        "womb": (
-            {
-                "heartbeat_rate": womb_state.heartbeat_rate,
-                "ambient_load": womb_state.ambient_load,
-                "rhythmic_stability": womb_state.rhythmic_stability,
-                "active": womb_state.womb_active,
-            }
-            if womb_state else None
-        ),
-
-        "candidates": state["scuttling"].candidates_snapshot(),
-
+        "ticks": state["ticks"],
+        "metrics": {
+            "Z": Z,
+            "Coherence": coherence,
+            "Stability": stability,
+            "Load": load,
+        },
+        "active_frame": frames.active,
+        "memory_count": state["memory"].count(),
+        "prediction_error": state.get("prediction_error", 0.0),
+        "gates": gates,
+        "embodiment": embodiment,
+        "womb": womb,
         "birth": (
             {
-                "born": birth.born,
-                "reason": birth.reason,
-                "tick": birth.tick,
+                "born": state["birth_state"].born,
+                "reason": state["birth_state"].reason,
+                "tick": state["birth_state"].tick,
             }
-            if birth else None
+            if state.get("birth_state")
+            else None
         ),
+        "scuttling_candidates": state["scuttling_engine"].candidates_snapshot(),
     }
