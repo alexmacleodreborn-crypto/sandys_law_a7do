@@ -1,26 +1,41 @@
 import streamlit as st
-from sandys_law_a7do.bootstrap import tick_system
+from sandys_law_a7do.engine.tick_engine import step_tick
 
 
 def render_dashboard(state, snapshot):
-    st.title("A7DO — Prebirth Embodiment")
+    st.title("A7DO — Development Dashboard")
 
+    # -----------------------------
+    # Controls
+    # -----------------------------
     if st.button("⏭ Tick"):
-        tick_system(state)
+        step_tick(state)
 
     data = snapshot()
-    metrics = data["metrics"]
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Tick", data["ticks"])
-    c2.metric("Z", round(metrics["Z"], 3))
-    c3.metric("Coherence", round(metrics["Coherence"], 3))
-    c4.metric("Stability", round(metrics["Stability"], 3))
-
-    st.subheader("Local Embodiment Candidates")
-
-    candidates = data.get("embodiment_candidates", [])
-    if candidates:
-        st.table(candidates)
+    # -----------------------------
+    # Womb
+    # -----------------------------
+    st.subheader("Prebirth — Womb")
+    if data["womb"]:
+        st.json(data["womb"])
     else:
-        st.caption("Embodiment forming…")
+        st.caption("Womb not yet active")
+
+    # -----------------------------
+    # Scuttling / Candidates
+    # -----------------------------
+    st.subheader("Embodied Growth (Candidates)")
+    if data["candidates"]:
+        st.table(data["candidates"])
+    else:
+        st.caption("No candidates yet")
+
+    # -----------------------------
+    # Birth
+    # -----------------------------
+    st.subheader("Birth State")
+    if data["birth"]:
+        st.json(data["birth"])
+    else:
+        st.caption("Birth not yet triggered")
