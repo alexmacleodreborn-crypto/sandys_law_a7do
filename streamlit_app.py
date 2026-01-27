@@ -1,6 +1,6 @@
 import streamlit as st
-from sandys_law_a7do.bootstrap import build_system
-from sandys_law_a7do.interfaces.dashboard.dashboard_ui import render_dashboard
+from .bootstrap import build_system
+from .interfaces.dashboard.dashboard_ui import render_dashboard
 
 st.set_page_config(layout="wide")
 
