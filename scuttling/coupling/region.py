@@ -2,37 +2,30 @@
 CoupledRegion
 =============
 
-Defines a local embodied region for scuttling / reflex coupling.
+Local embodied region used by scuttling and reflex coupling.
 
 Phase constraints:
 - No cognition
 - No planning
 - No semantics
-- Pure local state + signal propagation
+- Pure local state + signal decay / propagation
 """
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from typing import Dict, Optional, Set
 
 
 @dataclass
 class CoupledRegion:
     """
     A minimal local coupling region.
-
-    Represents:
-    - a body-local zone
-    - reflex-relevant signals
-    - coupling strength to neighbours
-
-    This is NOT a cognitive structure.
     """
 
     name: str
 
     # -------------------------
-    # Local signals
+    # Local embodied signals
     # -------------------------
     load: float = 0.0
     pain: float = 0.0
@@ -51,7 +44,7 @@ class CoupledRegion:
     active: bool = True
 
     # --------------------------------------------------
-    # Update local sensory signals
+    # Signal update
     # --------------------------------------------------
 
     def update_signals(
@@ -63,42 +56,63 @@ class CoupledRegion:
         thermal: Optional[float] = None,
     ) -> None:
         if load is not None:
-            self.load = float(load)
+            self.load = max(0.0, float(load))
         if pain is not None:
-            self.pain = float(pain)
+            self.pain = max(0.0, float(pain))
         if contact is not None:
             self.contact = bool(contact)
         if thermal is not None:
-            self.thermal = float(thermal)
+            self.thermal = max(0.0, float(thermal))
+
+    # --------------------------------------------------
+    # Recovery / decay (THIS FIXES THE ERROR)
+    # --------------------------------------------------
+
+    def recover(self, rate: float = 0.01) -> None:
+        """
+        Passive recovery toward baseline.
+
+        This represents:
+        - tissue relaxation
+        - neural settling
+        - load dissipation
+
+        No learning, no decisions.
+        """
+
+        r = max(0.0, float(rate))
+
+        self.load = max(0.0, self.load - r)
+        self.pain = max(0.0, self.pain - r)
+        self.thermal = max(0.0, self.thermal - r)
+
+        # Contact resets unless refreshed externally
+        self.contact = False
 
     # --------------------------------------------------
     # Coupling management
     # --------------------------------------------------
 
     def couple_to(self, other: "CoupledRegion", strength: float = 1.0) -> None:
-        """
-        Create bidirectional coupling between regions.
-        """
         self.neighbours.add(other.name)
         other.neighbours.add(self.name)
 
-        self.coupling_strength[other.name] = float(strength)
-        other.coupling_strength[self.name] = float(strength)
+        s = max(0.0, float(strength))
+        self.coupling_strength[other.name] = s
+        other.coupling_strength[self.name] = s
 
     # --------------------------------------------------
-    # Signal propagation (purely local)
+    # Propagated load (conservative)
     # --------------------------------------------------
 
     def propagated_load(self) -> float:
-        """
-        Compute local propagated load signal.
-        Conservative: no amplification.
-        """
-        base = self.load + self.pain + (self.thermal if self.contact else 0.0)
+        base = self.load + self.pain
+        if self.contact:
+            base += self.thermal
         return max(0.0, base)
 
     # --------------------------------------------------
-    # Snapshot (debug / UI safe)
+    # Snapshot (UI / debug safe)
     # --------------------------------------------------
 
     def snapshot(self) -> Dict[str, object]:
