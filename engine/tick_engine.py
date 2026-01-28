@@ -78,7 +78,7 @@ def step_tick(state: dict) -> None:
         )
 
         if transition.transitioned:
-            from sandys_law_a7do.genesis.birth_state import BirthState
+            from genesis.birth_state import BirthState
 
             state["birth_state"] = BirthState(
                 born=True,
