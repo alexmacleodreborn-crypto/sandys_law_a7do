@@ -9,7 +9,7 @@ def step_tick(state: dict) -> None:
     - Advance time
     - Run womb physics ONLY pre-birth
     - Accumulate gestation criteria
-    - Record developmental growth trace
+    - Delegate embodiment growth computation
     - Execute birth transition exactly once
     - Freeze womb engine AND womb snapshot after birth
     - Evaluate gates post-birth
@@ -22,20 +22,19 @@ def step_tick(state: dict) -> None:
     state["ticks"] += 1
 
     # ------------------------------------------------
-    # PRE-BIRTH: WOMB + GESTATION + DEVELOPMENT TRACE
+    # PRE-BIRTH: WOMB + GESTATION
     # ------------------------------------------------
     if state["birth_state"] is None:
-        # ---- Womb physics ----
         womb = state["womb_engine"]
         womb_state = womb.step()
         state["last_womb_state"] = womb_state
 
-        # ---- Structural metrics ----
+        # Structural metrics
         state["last_coherence"] = womb_state.rhythmic_stability
         state["structural_load"] = womb_state.ambient_load
         state["last_fragmentation"] = 1.0 - womb_state.rhythmic_stability
 
-        # ---- Gestation accumulation ----
+        # Gestation accumulation
         criteria = state["birth_criteria"]
         criteria.update(
             dt=1.0,
@@ -44,31 +43,27 @@ def step_tick(state: dict) -> None:
         )
 
         # ------------------------------------------------
-        # DEVELOPMENT TRACE (VISUALISATION ONLY)
+        # EMBODIMENT GROWTH (DELEGATED)
         # ------------------------------------------------
-        trace = state["development_trace"]
+        growth = state["embodiment_growth"].compute(
+            tick=state["ticks"],
+            stability=womb_state.rhythmic_stability,
+            exposure_time=criteria._time_exposed,
+            min_exposure=criteria.MIN_EXPOSURE_TIME,
+        )
 
+        trace = state["development_trace"]
         trace["ticks"].append(state["ticks"])
         trace["heartbeat"].append(womb_state.heartbeat_rate)
         trace["ambient_load"].append(womb_state.ambient_load)
         trace["stability"].append(womb_state.rhythmic_stability)
+        trace["brain_coherence"].append(growth["brain_coherence"])
+        trace["body_growth"].append(growth["body_growth"])
+        trace["limb_growth"].append(growth["limb_growth"])
 
-        # Proto-brain coherence (capacity only, no semantics)
-        trace["brain_coherence"].append(
-            womb_state.rhythmic_stability
-            * min(1.0, state["ticks"] / 100.0)
-        )
-
-        # Body growth precedes limbs
-        trace["body_growth"].append(
-            min(1.0, state["ticks"] / criteria.MIN_EXPOSURE_TIME)
-        )
-
-        trace["limb_growth"].append(
-            max(0.0, (state["ticks"] - 20) / criteria.MIN_EXPOSURE_TIME)
-        )
-
-        # ---- Birth readiness & transition ----
+        # ------------------------------------------------
+        # Birth readiness & transition
+        # ------------------------------------------------
         readiness = criteria.evaluate()
         transition = state["birth_transition"].attempt_transition(
             readiness=readiness,
@@ -84,10 +79,10 @@ def step_tick(state: dict) -> None:
                 tick=state["ticks"],
             )
 
-            # 🔒 FREEZE WOMB ENGINE
+            # Freeze womb engine
             state["womb_engine"].womb_active = False
 
-            # 🔒 FREEZE LAST WOMB SNAPSHOT (UI CONSISTENCY)
+            # Freeze last womb snapshot
             if state.get("last_womb_state") is not None:
                 state["last_womb_state"].womb_active = False
 
@@ -106,16 +101,12 @@ def step_tick(state: dict) -> None:
     # ------------------------------------------------
     # SCUTTLING (ALWAYS RUNS)
     # ------------------------------------------------
-    scuttling = state["scuttling_engine"]
-    scuttling.step()
+    state["scuttling_engine"].step()
 
 
 class TickEngine:
     """
     Thin adapter around the canonical step_tick().
-
-    Exists only to provide a stable interface
-    for LifeCycle and visualization layers.
     """
 
     def __init__(self, state: dict | None = None):
@@ -129,10 +120,6 @@ class TickEngine:
     def snapshot(self) -> dict:
         return system_snapshot(self.state)
 
-
-# ------------------------------------------------
-# Internal helper (avoids circular imports)
-# ------------------------------------------------
 
 def _build_state():
     from bootstrap import build_system
