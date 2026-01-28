@@ -10,6 +10,7 @@ def step_tick(state: dict) -> None:
     - Run womb physics ONLY pre-birth
     - Maintain umbilical life support
     - Accumulate gestation criteria
+    - Grow anatomical body (NEW – critical)
     - Delegate embodiment growth computation
     - Execute birth transition exactly once
     - Freeze womb + umbilical after birth
@@ -24,34 +25,27 @@ def step_tick(state: dict) -> None:
     state["ticks"] += 1
 
     # ------------------------------------------------
-    # PRE-BIRTH
+    # PRE-BIRTH (GESTATION)
     # ------------------------------------------------
     if state["birth_state"] is None:
+        # ---- Womb physics ----
         womb = state["womb_engine"]
         womb_state = womb.step()
         state["last_womb_state"] = womb_state
 
-        # Umbilical life support
+        # ---- Umbilical life support ----
         umb = state["umbilical_link"]
         umb_state = umb.step(womb_active=womb_state.womb_active)
         state["last_umbilical_state"] = umb_state
-        
-        # Embodiment growth
-        growth = state["embodiment_growth"].compute(
-        tick=state["ticks"],
-        stability=womb_state.rhythmic_stability,
-        exposure_time=criteria._time_exposed,
-        min_exposure=criteria.MIN_EXPOSURE_TIME,
-        )
-        
-        # Structural metrics
+
+        # ---- Structural metrics ----
         state["last_coherence"] = womb_state.rhythmic_stability
         state["structural_load"] = (
             womb_state.ambient_load * (1.0 - umb_state.load_transfer * 0.5)
         )
         state["last_fragmentation"] = 1.0 - womb_state.rhythmic_stability
 
-        # Gestation criteria
+        # ---- Gestation criteria accumulation ----
         criteria = state["birth_criteria"]
         criteria.update(
             dt=1.0,
@@ -59,7 +53,7 @@ def step_tick(state: dict) -> None:
             ambient_load=womb_state.ambient_load,
         )
 
-        # Embodiment growth
+        # ---- Embodiment growth model (numbers only) ----
         growth = state["embodiment_growth"].compute(
             tick=state["ticks"],
             stability=womb_state.rhythmic_stability,
@@ -67,6 +61,13 @@ def step_tick(state: dict) -> None:
             min_exposure=criteria.MIN_EXPOSURE_TIME,
         )
 
+        # ------------------------------------------------
+        # ANATOMICAL GROWTH (PHYSICAL BODY)  ✅ KEY FIX
+        # ------------------------------------------------
+        anatomy = state["anatomy"]
+        anatomy.grow(stability=womb_state.rhythmic_stability)
+
+        # ---- Development trace (observer only) ----
         trace = state["development_trace"]
         trace["ticks"].append(state["ticks"])
         trace["heartbeat"].append(womb_state.heartbeat_rate)
@@ -78,7 +79,7 @@ def step_tick(state: dict) -> None:
         trace["umbilical_load"].append(umb_state.load_transfer)
         trace["rhythmic_coupling"].append(umb_state.rhythmic_coupling)
 
-        # Birth transition
+        # ---- Birth readiness & transition ----
         readiness = criteria.evaluate()
         transition = state["birth_transition"].attempt_transition(
             readiness=readiness,
@@ -94,6 +95,7 @@ def step_tick(state: dict) -> None:
                 tick=state["ticks"],
             )
 
+            # Freeze womb + umbilical
             womb_state.womb_active = False
             umb_state.active = False
 
@@ -101,7 +103,7 @@ def step_tick(state: dict) -> None:
     # POST-BIRTH
     # ------------------------------------------------
     if state["birth_state"] is not None:
-        # Gates
+        # ---- Gate evaluation ----
         state["gate_engine"].evaluate(
             coherence=state["last_coherence"],
             fragmentation=state["last_fragmentation"],
@@ -110,11 +112,11 @@ def step_tick(state: dict) -> None:
             load=state["structural_load"],
         )
 
-        # Sensory ramp-up
+        # ---- Sensory ramp-up ----
         state["sensory_readiness"].step(born=True)
 
     # ------------------------------------------------
-    # SCUTTLING (always)
+    # SCUTTLING (ALWAYS RUNS)
     # ------------------------------------------------
     state["scuttling_engine"].step()
 
@@ -138,5 +140,4 @@ class TickEngine:
 
 def _build_state():
     from bootstrap import build_system
-
     return build_system()
