@@ -1,8 +1,8 @@
 from __future__ import annotations
 from enum import Enum
 
-from sandys_law_a7do.engine.tick_engine import TickEngine
-from sandys_law_a7do.world.world_state import make_default_world
+from engine.tick_engine import TickEngine
+from world.world_state import make_default_world
 
 
 class LifePhase(Enum):
