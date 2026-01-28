@@ -21,7 +21,7 @@ from scuttling.engine import ScuttlingEngine
 # -------------------------
 # Genesis / embodiment
 # -------------------------
-from sandys_law_a7do.scuttling.engine import ScuttlingEngine
+from scuttling.engine import ScuttlingEngine
 from genesis.womb.physics import WombPhysicsEngine
 from genesis.birth import BirthEvaluator
 
