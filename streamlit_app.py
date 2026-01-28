@@ -98,3 +98,13 @@ st.header("🦴 Anatomy (Biological Structure)")
 
 for region, data in snap["anatomy"].items():
     st.markdown(
+        f"**{region.replace('_', ' ').title()}** — "
+        f"Growth: `{data['growth']}` | Stability: `{data['stability']}`"
+    )
+
+# ==================================================
+# BODY SCHEMA (POST-BIRTH)
+# ==================================================
+st.header("🧠 Body Schema (Scuttling)")
+
+st.json(snap["scuttling_candidates"])
