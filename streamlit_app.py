@@ -1,5 +1,5 @@
 import streamlit as st
-from .life_cycle import LifeCycle
+from sandys_law_a7do.life_cycle import LifeCycle
 
 # --------------------------------------------------
 # Page config
@@ -43,6 +43,7 @@ st.header("Lifecycle Status")
 st.json(
     {
         "Ticks": snap["ticks"],
+        "Phase": lc.phase.value,
         "Born": snap["birth"]["born"] if snap.get("birth") else False,
         "Birth Reason": snap["birth"]["reason"] if snap.get("birth") else None,
     }
@@ -70,11 +71,12 @@ with c2:
         st.info("Umbilical detached")
 
 # ==================================================
-# DEVELOPMENT DASHBOARD
+# DEVELOPMENT DASHBOARD (NO ALTAIR)
 # ==================================================
 st.header("🧬 Development Dashboard")
 
-if trace and len(trace["ticks"]) > 1:
+if trace and len(trace.get("ticks", [])) > 1:
+
     st.subheader("🫀 Cardio-Rhythmic Development")
     st.write(
         {
@@ -96,12 +98,14 @@ if trace and len(trace["ticks"]) > 1:
 
     st.subheader("Current Development State")
     m1, m2, m3 = st.columns(3)
+
     with m1:
         st.metric("Body Growth", round(trace["body_growth"][-1], 3))
     with m2:
         st.metric("Limb Growth", round(trace["limb_growth"][-1], 3))
     with m3:
         st.metric("Brain Coherence", round(trace["brain_coherence"][-1], 3))
+
 else:
     st.info("Development data will appear after a few ticks.")
 
