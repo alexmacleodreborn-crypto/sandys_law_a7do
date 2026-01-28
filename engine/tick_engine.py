@@ -1,154 +1,193 @@
-from bootstrap import system_snapshot
+"""
+A7DO Bootstrap — Authoritative System Constructor
+"""
+
+from __future__ import annotations
+from typing import Callable, Dict, Any, Tuple
+
+# -------------------------
+# Core systems
+# -------------------------
+from frames.store import FrameStore
+from memory.structural_memory import StructuralMemory
+from scuttling.engine import ScuttlingEngine
+
+# -------------------------
+# Gates
+# -------------------------
+from gates.engine import GateEngine
+
+# -------------------------
+# Genesis / birth
+# -------------------------
+from genesis.womb.physics import WombPhysicsEngine
+from genesis.womb.umbilical import UmbilicalLink
+from genesis.birth.criteria import BirthCriteria
+from genesis.birth.transition import BirthTransitionEngine
+from genesis.birth_state import BirthState
+
+# -------------------------
+# Embodiment
+# -------------------------
+from embodiment.ledger.ledger import EmbodimentLedger
+from embodiment.bridge.accountant import summarize_embodiment
+from embodiment.growth_model import EmbodimentGrowthModel
+
+# -------------------------
+# Sensory
+# -------------------------
+from sensory.readiness import SensoryReadiness
 
 
-def step_tick(state: dict) -> None:
-    """
-    THE ONLY CLOCK IN THE SYSTEM
+# ============================================================
+# SYSTEM CONSTRUCTOR
+# ============================================================
 
-    Responsibilities:
-    - Advance time
-    - Run womb physics ONLY pre-birth
-    - Accumulate gestation criteria
-    - Delegate embodiment growth computation
-    - Execute birth transition exactly once
-    - Freeze womb engine AND womb snapshot after birth
-    - Initialise sensory readiness at birth
-    - Evaluate gates post-birth
-    - Run scuttling continuously
-    """
+def build_system() -> Tuple[Callable[[], dict], dict]:
 
-    # ------------------------------------------------
-    # TIME (canonical)
-    # ------------------------------------------------
-    state["ticks"] += 1
+    state: Dict[str, Any] = {
+        # -----------------
+        # Time
+        # -----------------
+        "ticks": 0,
 
-    # ------------------------------------------------
-    # PRE-BIRTH: WOMB + GESTATION
-    # ------------------------------------------------
-    if state["birth_state"] is None:
-        womb = state["womb_engine"]
-        womb_state = womb.step()
-        state["last_womb_state"] = womb_state
+        # -----------------
+        # Core runtime
+        # -----------------
+        "frames": FrameStore(),
+        "memory": StructuralMemory(),
+        "gate_engine": GateEngine(),
 
-        # Structural metrics
-        state["last_coherence"] = womb_state.rhythmic_stability
-        state["structural_load"] = womb_state.ambient_load
-        state["last_fragmentation"] = 1.0 - womb_state.rhythmic_stability
+        # -----------------
+        # Prebirth & embodiment
+        # -----------------
+        "womb_engine": WombPhysicsEngine(),
+        "umbilical_link": UmbilicalLink(),
+        "scuttling_engine": ScuttlingEngine(),
+        "embodiment_ledger": EmbodimentLedger(),
+        "embodiment_growth": EmbodimentGrowthModel(),
 
-        # Gestation accumulation
-        criteria = state["birth_criteria"]
-        criteria.update(
-            dt=1.0,
-            stability=womb_state.rhythmic_stability,
-            ambient_load=womb_state.ambient_load,
-        )
+        # -----------------
+        # Sensory (NEW)
+        # -----------------
+        "sensory_readiness": SensoryReadiness(),
 
-        # ------------------------------------------------
-        # EMBODIMENT GROWTH (DELEGATED)
-        # ------------------------------------------------
-        growth = state["embodiment_growth"].compute(
-            tick=state["ticks"],
-            stability=womb_state.rhythmic_stability,
-            exposure_time=criteria._time_exposed,
-            min_exposure=criteria.MIN_EXPOSURE_TIME,
-        )
+        # -----------------
+        # Birth (authoritative)
+        # -----------------
+        "birth_criteria": BirthCriteria(),
+        "birth_transition": BirthTransitionEngine(),
+        "birth_state": None,
 
-        trace = state["development_trace"]
-        trace["ticks"].append(state["ticks"])
-        trace["heartbeat"].append(womb_state.heartbeat_rate)
-        trace["ambient_load"].append(womb_state.ambient_load)
-        trace["stability"].append(womb_state.rhythmic_stability)
-        trace["brain_coherence"].append(growth["brain_coherence"])
-        trace["body_growth"].append(growth["body_growth"])
-        trace["limb_growth"].append(growth["limb_growth"])
+        # -----------------
+        # Structural channels
+        # -----------------
+        "last_coherence": 0.0,
+        "last_fragmentation": 0.0,
+        "structural_load": 0.0,
 
-        # ------------------------------------------------
-        # Birth readiness & transition
-        # ------------------------------------------------
-        readiness = criteria.evaluate()
-        transition = state["birth_transition"].attempt_transition(
-            readiness=readiness,
-            state=state,
-        )
+        # -----------------
+        # Development trace (visual only)
+        # -----------------
+        "development_trace": {
+            "ticks": [],
+            "heartbeat": [],
+            "ambient_load": [],
+            "stability": [],
+            "brain_coherence": [],
+            "body_growth": [],
+            "limb_growth": [],
+            "umbilical_load": [],
+            "rhythmic_coupling": [],
+        },
 
-        if transition.transitioned:
-            from genesis.birth_state import BirthState
+        # -----------------
+        # Cached views
+        # -----------------
+        "last_womb_state": None,
+        "last_umbilical_state": None,
+    }
 
-            state["birth_state"] = BirthState(
-                born=True,
-                reason=readiness.reason,
-                tick=state["ticks"],
-            )
+    def snapshot() -> dict:
+        return system_snapshot(state)
 
-            # 🔒 Freeze womb engine
-            state["womb_engine"].womb_active = False
-
-            # 🔒 Freeze last womb snapshot
-            if state.get("last_womb_state") is not None:
-                state["last_womb_state"].womb_active = False
-
-            # ------------------------------------------------
-            # INITIAL SENSORY READINESS (POST-BIRTH ONLY)
-            # ------------------------------------------------
-            sr = state["sensory_readiness"]
-
-            # Core: protected, internal only
-            sr.set_region(
-                "core",
-                proprioception=0.2,
-            )
-
-            # First limb: primary contact
-            sr.set_region(
-                "limb_left",
-                touch=0.6,
-                pain=0.8,
-                proprioception=0.5,
-                temperature=0.3,
-            )
-
-            # Second limb: differentiating
-            sr.set_region(
-                "limb_right",
-                touch=0.2,
-                pain=0.4,
-            )
-
-    # ------------------------------------------------
-    # POST-BIRTH: GATE EVALUATION
-    # ------------------------------------------------
-    if state["birth_state"] is not None:
-        gate_engine = state["gate_engine"]
-        gate_engine.evaluate(
-            coherence=state["last_coherence"],
-            fragmentation=state["last_fragmentation"],
-            stability=state["last_coherence"] * (1.0 - state["structural_load"]),
-            load=state["structural_load"],
-        )
-
-    # ------------------------------------------------
-    # SCUTTLING (ALWAYS RUNS)
-    # ------------------------------------------------
-    state["scuttling_engine"].step()
+    return snapshot, state
 
 
-class TickEngine:
-    """
-    Thin adapter around the canonical step_tick().
-    """
+# ============================================================
+# SNAPSHOT (READ-ONLY)
+# ============================================================
 
-    def __init__(self, state: dict | None = None):
-        if state is None:
-            _, state = _build_state()
-        self.state = state
+def system_snapshot(state: dict) -> dict:
+    frames = state["frames"]
 
-    def tick(self) -> None:
-        step_tick(self.state)
+    coherence = float(state.get("last_coherence", 0.0))
+    Z = float(state.get("last_fragmentation", 0.0))
+    load = float(state.get("structural_load", 0.0))
+    stability = coherence * (1.0 - load)
 
-    def snapshot(self) -> dict:
-        return system_snapshot(self.state)
+    # Gates
+    gates = {}
+    ge = state.get("gate_engine")
+    if ge:
+        try:
+            snap = ge.snapshot()
+            for name, g in (snap.gates or {}).items():
+                gates[name] = g
+        except Exception:
+            pass
 
+    # Embodiment summary
+    embodiment = None
+    try:
+        embodiment = summarize_embodiment(state["embodiment_ledger"])
+    except Exception:
+        pass
 
-def _build_state():
-    from bootstrap import build_system
-    return build_system()
+    # Womb
+    womb = None
+    ws = state.get("last_womb_state")
+    if ws:
+        womb = {
+            "heartbeat_rate": ws.heartbeat_rate,
+            "ambient_load": ws.ambient_load,
+            "rhythmic_stability": ws.rhythmic_stability,
+            "womb_active": ws.womb_active,
+        }
+
+    # Umbilical
+    umbilical = None
+    us = state.get("last_umbilical_state")
+    if us:
+        umbilical = {
+            "active": us.active,
+            "load_transfer": us.load_transfer,
+            "rhythmic_coupling": us.rhythmic_coupling,
+        }
+
+    return {
+        "ticks": state["ticks"],
+        "metrics": {
+            "Z": Z,
+            "Coherence": coherence,
+            "Stability": stability,
+            "Load": load,
+        },
+        "active_frame": frames.active,
+        "memory_count": state["memory"].count(),
+        "gates": gates,
+        "embodiment": embodiment,
+        "womb": womb,
+        "umbilical": umbilical,
+        "sensory": state["sensory_readiness"].snapshot(),
+        "birth": (
+            {
+                "born": state["birth_state"].born,
+                "reason": state["birth_state"].reason,
+                "tick": state["birth_state"].tick,
+            }
+            if state.get("birth_state")
+            else None
+        ),
+        "scuttling_candidates": state["scuttling_engine"].candidates_snapshot(),
+    }
