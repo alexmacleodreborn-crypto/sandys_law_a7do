@@ -1,5 +1,7 @@
 """
 A7DO Bootstrap — Authoritative System Constructor
+
+This file is the ONLY place where global system state is assembled.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ from genesis.birth_state import BirthState
 # -------------------------
 # Embodiment
 # -------------------------
+from embodiment.anatomy import create_default_anatomy, anatomy_snapshot
 from embodiment.ledger.ledger import EmbodimentLedger
 from embodiment.bridge.accountant import summarize_embodiment
 from embodiment.growth_model import EmbodimentGrowthModel
@@ -44,6 +47,9 @@ from sensory.readiness import SensoryReadiness
 # ============================================================
 
 def build_system() -> Tuple[Callable[[], dict], dict]:
+    """
+    Construct the full A7DO system.
+    """
 
     state: Dict[str, Any] = {
         # -----------------
@@ -59,16 +65,25 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "gate_engine": GateEngine(),
 
         # -----------------
-        # Prebirth & embodiment
+        # Womb & gestation
         # -----------------
         "womb_engine": WombPhysicsEngine(),
         "umbilical_link": UmbilicalLink(),
-        "scuttling_engine": ScuttlingEngine(),
-        "embodiment_ledger": EmbodimentLedger(),
-        "embodiment_growth": EmbodimentGrowthModel(),
 
         # -----------------
-        # Sensory (NEW)
+        # Embodiment (BIOLOGICAL)
+        # -----------------
+        "anatomy": create_default_anatomy(),
+        "embodiment_growth": EmbodimentGrowthModel(),
+        "embodiment_ledger": EmbodimentLedger(),
+
+        # -----------------
+        # Scuttling (POST-BIRTH)
+        # -----------------
+        "scuttling_engine": ScuttlingEngine(),
+
+        # -----------------
+        # Sensory (POST-BIRTH)
         # -----------------
         "sensory_readiness": SensoryReadiness(),
 
@@ -80,14 +95,14 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "birth_state": None,
 
         # -----------------
-        # Structural channels
+        # Structural metrics
         # -----------------
         "last_coherence": 0.0,
         "last_fragmentation": 0.0,
         "structural_load": 0.0,
 
         # -----------------
-        # Development trace (visual only)
+        # Development trace (observer only)
         # -----------------
         "development_trace": {
             "ticks": [],
@@ -102,7 +117,7 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         },
 
         # -----------------
-        # Cached views
+        # Cached snapshots
         # -----------------
         "last_womb_state": None,
         "last_umbilical_state": None,
@@ -115,14 +130,14 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
 
 
 # ============================================================
-# SNAPSHOT (READ-ONLY)
+# SNAPSHOT (READ-ONLY, UI SAFE)
 # ============================================================
 
 def system_snapshot(state: dict) -> dict:
     frames = state["frames"]
 
     coherence = float(state.get("last_coherence", 0.0))
-    Z = float(state.get("last_fragmentation", 0.0))
+    fragmentation = float(state.get("last_fragmentation", 0.0))
     load = float(state.get("structural_load", 0.0))
     stability = coherence * (1.0 - load)
 
@@ -132,7 +147,7 @@ def system_snapshot(state: dict) -> dict:
     if ge:
         try:
             snap = ge.snapshot()
-            for name, g in (snap.gates or {}).items():
+            for name, g in snap.gates.items():
                 gates[name] = g
         except Exception:
             pass
@@ -144,7 +159,7 @@ def system_snapshot(state: dict) -> dict:
     except Exception:
         pass
 
-    # Womb
+    # Womb snapshot
     womb = None
     ws = state.get("last_womb_state")
     if ws:
@@ -155,7 +170,7 @@ def system_snapshot(state: dict) -> dict:
             "womb_active": ws.womb_active,
         }
 
-    # Umbilical
+    # Umbilical snapshot
     umbilical = None
     us = state.get("last_umbilical_state")
     if us:
@@ -168,14 +183,15 @@ def system_snapshot(state: dict) -> dict:
     return {
         "ticks": state["ticks"],
         "metrics": {
-            "Z": Z,
             "Coherence": coherence,
             "Stability": stability,
             "Load": load,
+            "Z": fragmentation,
         },
         "active_frame": frames.active,
         "memory_count": state["memory"].count(),
         "gates": gates,
+        "anatomy": anatomy_snapshot(state["anatomy"]),
         "embodiment": embodiment,
         "womb": womb,
         "umbilical": umbilical,
@@ -186,7 +202,7 @@ def system_snapshot(state: dict) -> dict:
                 "reason": state["birth_state"].reason,
                 "tick": state["birth_state"].tick,
             }
-            if state.get("birth_state")
+            if state["birth_state"]
             else None
         ),
         "scuttling_candidates": state["scuttling_engine"].candidates_snapshot(),
