@@ -7,19 +7,19 @@ def step_tick(state: dict) -> None:
     """
 
     # ------------------------------------------------
-    # TIME (single authority)
+    # TIME
     # ------------------------------------------------
     state["ticks"] += 1
 
     # ------------------------------------------------
-    # WOMB (prebirth environment)
+    # WOMB (prebirth physics)
     # ------------------------------------------------
     womb = state["womb_engine"]
     womb_state = womb.step()
     state["last_womb_state"] = womb_state
 
     # ------------------------------------------------
-    # SCUTTLING (embodied growth)
+    # SCUTTLING (always runs, but muted pre-birth)
     # ------------------------------------------------
     scuttling = state["scuttling_engine"]
     scuttling.step()
@@ -32,31 +32,40 @@ def step_tick(state: dict) -> None:
     state["last_fragmentation"] = 1.0 - womb_state.rhythmic_stability
 
     # ------------------------------------------------
-    # BIRTH EVALUATION (ONCE)
+    # BIRTH CRITERIA UPDATE (GESTATION)
+    # ------------------------------------------------
+    criteria = state["birth_criteria"]
+    criteria.update(
+        dt=1.0,
+        stability=womb_state.rhythmic_stability,
+        ambient_load=womb_state.ambient_load,
+    )
+
+    # ------------------------------------------------
+    # BIRTH TRANSITION (ONCE, GUARDED)
     # ------------------------------------------------
     if state["birth_state"] is None:
-        state["birth_state"] = state["birth_evaluator"].evaluate(
-            tick=state["ticks"],
-            metrics={
-                "Stability": state["last_coherence"],
-                "Load": state["structural_load"],
-                "Z": state["last_fragmentation"],
-            }
+        readiness = criteria.evaluate()
+        transition = state["birth_transition"].attempt_transition(
+            readiness=readiness,
+            state=state,
         )
+
+        if transition.transitioned:
+            from genesis.birth import BirthState
+            state["birth_state"] = BirthState(
+                born=True,
+                reason=readiness.reason,
+                tick=state["ticks"],
+            )
 
 
 class TickEngine:
     """
     Thin adapter around the canonical step_tick().
-
-    This exists ONLY to provide a stable object interface
-    for LifeCycle and visualization layers.
     """
 
     def __init__(self, state: dict | None = None):
-        # IMPORTANT:
-        # system_snapshot() returns a READ-ONLY VIEW
-        # We must build the real mutable system state.
         if state is None:
             _, state = _build_state()
         self.state = state
@@ -68,14 +77,6 @@ class TickEngine:
         return system_snapshot(self.state)
 
 
-# ------------------------------------------------
-# Internal helper (avoids circular imports)
-# ------------------------------------------------
-
 def _build_state():
-    """
-    Local import to avoid circular dependency:
-    tick_engine -> bootstrap -> tick_engine
-    """
     from bootstrap import build_system
     return build_system()
