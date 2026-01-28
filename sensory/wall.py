@@ -1,82 +1,105 @@
-# sensory/wall.py
-
 from dataclasses import dataclass
 from typing import Dict, List
 
 
-@dataclass
+# ============================================================
+# PRE-SEMANTIC SENSORY PACKET
+# ============================================================
+
+@dataclass(frozen=True)
 class SensoryPacket:
     """
-    Pre-semantic sensory unit.
-    """
-    modality: str          # vision, sound, touch, smell
-    body_region: str       # eye, ear, skin, mouth
-    intensity: float       # 0..1
-    coherence: float       # how structured it is
-    repetition: float      # how often recently seen
+    A degraded, body-localized sensory activation.
 
+    This is NOT perception.
+    This is NOT meaning.
+    This is a physiological precursor only.
+    """
+    modality: str           # vision, sound, touch, smell, taste
+    body_region: str        # eye, ear, skin, nose, mouth
+    intensity: float        # 0..1 (weak, noisy)
+    coherence: float        # 0..1 (structure, not meaning)
+    repetition: float       # 0..1 (temporal recurrence)
+
+
+# ============================================================
+# SENSORY WALL
+# ============================================================
 
 class SensoryWall:
     """
-    Developmental sensory filter.
+    Developmental sensory membrane.
 
-    Converts raw signals → pre-semantic packets.
+    Converts raw world stimulus into
+    noisy, body-bound, pre-semantic packets.
     """
 
     def __init__(self) -> None:
-        self.history: Dict[str, float] = {}
+        self._history: Dict[str, float] = {}
+
+    # --------------------------------------------------------
+    # MAIN FILTER
+    # --------------------------------------------------------
 
     def filter(
         self,
         *,
         raw_input: Dict[str, float],
-        anatomy: Dict[str, dict],
-        sensory_readiness: Dict[str, float],
+        anatomy: Dict[str, Dict[str, float]],
+        sensory_levels: Dict[str, float],
     ) -> List[SensoryPacket]:
+
         packets: List[SensoryPacket] = []
 
-        for channel, intensity in raw_input.items():
-            readiness = sensory_readiness.get(channel, 0.0)
+        for modality, raw_intensity in raw_input.items():
+            readiness = sensory_levels.get(modality, 0.0)
             if readiness <= 0.0:
                 continue
 
-            body_region = self._map_channel_to_body(channel)
+            body_region = self._map_modality_to_body(modality)
             if body_region not in anatomy:
                 continue
 
             growth = anatomy[body_region]["growth"]
             if growth < 0.3:
-                continue  # organ not mature
+                continue  # organ not mature enough
 
-            key = f"{channel}:{body_region}"
-            prev = self.history.get(key, 0.0)
-            repetition = min(1.0, prev + 0.1)
+            key = f"{modality}:{body_region}"
+            prev_rep = self._history.get(key, 0.0)
+            repetition = min(1.0, prev_rep + 0.08)
 
             coherence = min(
                 1.0,
-                readiness * growth * repetition
+                readiness * growth * repetition,
             )
+
+            intensity = raw_intensity * readiness * growth
 
             packets.append(
                 SensoryPacket(
-                    modality=channel,
+                    modality=modality,
                     body_region=body_region,
-                    intensity=intensity,
-                    coherence=coherence,
-                    repetition=repetition,
+                    intensity=round(intensity, 3),
+                    coherence=round(coherence, 3),
+                    repetition=round(repetition, 3),
                 )
             )
 
-            self.history[key] = repetition
+            self._history[key] = repetition
 
         return packets
 
+    # --------------------------------------------------------
+    # MODALITY → BODY MAP
+    # --------------------------------------------------------
+
     @staticmethod
-    def _map_channel_to_body(channel: str) -> str:
+    def _map_modality_to_body(modality: str) -> str:
         return {
-            "vision": "eye",
-            "sound": "ear",
+            "vision": "eyes",
+            "sound": "ears",
             "touch": "skin",
             "smell": "nose",
             "taste": "mouth",
-        }.get(channel, "")
+            "balance": "spine",
+        }.get(modality, "")
