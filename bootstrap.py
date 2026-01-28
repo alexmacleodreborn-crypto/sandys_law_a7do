@@ -39,9 +39,9 @@ from square.square import Square
 # -------------------------
 # World (NEW)
 # -------------------------
-from sandys_law_a7do.world.world_state import make_default_world
-from sandys_law_a7do.world.runner import WorldRunner
-from sandys_law_a7do.world.sensors import SensorSuite
+from world.world_state import make_default_world
+from world.world_runner import WorldRunner
+from world.sensors import SensorSuite
 
 # ============================================================
 # SYSTEM CONSTRUCTOR
