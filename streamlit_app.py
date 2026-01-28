@@ -1,5 +1,5 @@
 import streamlit as st
-from sandys_law_a7do.life_cycle import LifeCycle
+from .life_cycle import LifeCycle
 
 # --------------------------------------------------
 # Page config
