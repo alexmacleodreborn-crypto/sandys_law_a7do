@@ -3,7 +3,7 @@ from typing import Dict, List
 
 
 # ============================================================
-# PRE-SEMANTIC SENSORY PACKET
+# PRE-SEMANTIC SENSORY PACKET (BIOLOGICAL TRUTH)
 # ============================================================
 
 @dataclass(frozen=True)
@@ -16,7 +16,7 @@ class SensoryPacket:
     This is a physiological precursor only.
     """
     modality: str           # vision, sound, touch, smell, taste
-    body_region: str        # eye, ear, skin, nose, mouth
+    body_region: str        # eyes, ears, skin, nose, mouth
     intensity: float        # 0..1 (weak, noisy)
     coherence: float        # 0..1 (structure, not meaning)
     repetition: float       # 0..1 (temporal recurrence)
@@ -31,7 +31,8 @@ class SensoryWall:
     Developmental sensory membrane.
 
     Converts raw world stimulus into
-    noisy, body-bound, pre-semantic packets.
+    noisy, body-bound, pre-semantic packets,
+    then exposes them in a transport-safe form.
     """
 
     def __init__(self) -> None:
@@ -47,9 +48,10 @@ class SensoryWall:
         raw_input: Dict[str, float],
         anatomy: Dict[str, Dict[str, float]],
         sensory_levels: Dict[str, float],
-    ) -> List[SensoryPacket]:
+    ) -> List[Dict]:
 
-        packets: List[SensoryPacket] = []
+        biological_packets: List[SensoryPacket] = []
+        transport_packets: List[Dict] = []
 
         for modality, raw_intensity in raw_input.items():
             readiness = sensory_levels.get(modality, 0.0)
@@ -75,19 +77,31 @@ class SensoryWall:
 
             intensity = raw_intensity * readiness * growth
 
-            packets.append(
-                SensoryPacket(
-                    modality=modality,
-                    body_region=body_region,
-                    intensity=round(intensity, 3),
-                    coherence=round(coherence, 3),
-                    repetition=round(repetition, 3),
-                )
+            packet = SensoryPacket(
+                modality=modality,
+                body_region=body_region,
+                intensity=round(intensity, 3),
+                coherence=round(coherence, 3),
+                repetition=round(repetition, 3),
             )
+
+            biological_packets.append(packet)
+
+            # --------------------------------------------
+            # TRANSPORT WRAPPER (Square / Frames SAFE)
+            # --------------------------------------------
+
+            transport_packets.append({
+                "channel": modality,               # REQUIRED by Square
+                "region": body_region,              # body grounded
+                "value": packet.intensity,          # signal strength
+                "confidence": packet.coherence,     # structural certainty
+                "repetition": packet.repetition,    # temporal recurrence
+            })
 
             self._history[key] = repetition
 
-        return packets
+        return transport_packets
 
     # --------------------------------------------------------
     # MODALITY → BODY MAP
@@ -98,6 +112,7 @@ class SensoryWall:
         return {
             "vision": "eyes",
             "sound": "ears",
+            "auditory": "ears",
             "touch": "skin",
             "smell": "nose",
             "taste": "mouth",
