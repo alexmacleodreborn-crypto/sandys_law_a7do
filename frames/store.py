@@ -1,36 +1,87 @@
+# sandys_law_a7do/frames/store.py
+
+from typing import Any, Dict, List, Optional
+from sensory.wall import SensoryPacket
+
+
 class FrameStore:
-    def __init__(self):
-        self.active = None
-        self._buffer = []
+    """
+    Frame Store
 
-    # -------------------------------------------------
-    # SENSORY INGEST (TRANSPORT PACKETS ONLY)
-    # -------------------------------------------------
+    Responsibilities:
+    - Observe pre-semantic sensory packets
+    - Open frames ONLY when coherence threshold is crossed
+    - Store frames as internal data (dicts)
+    - NO learning
+    - NO semantics
+    - NO mutation of packets
+    """
 
-    def observe_sensory(self, packets: list[dict]) -> None:
+    def __init__(self) -> None:
+        self.frames: List[Dict[str, Any]] = []
+        self.active: Optional[Dict[str, Any]] = None
+
+    # --------------------------------------------------
+    # SENSORY OBSERVATION
+    # --------------------------------------------------
+
+    def observe_sensory(self, packets: List[SensoryPacket]) -> None:
         """
-        Observe pre-semantic sensory packets.
+        Observe degraded sensory packets.
 
-        Packets are dictionaries with:
-        - channel
-        - region
-        - value
-        - confidence
-        - repetition
+        Frames open ONLY when packet coherence is sufficient.
         """
 
         for p in packets:
-            confidence = p.get("confidence", 0.0)
-            if confidence < 0.4:
-                continue  # too noisy, ignore
+            # HARD SAFETY GUARD — never crash on bad data
+            if not isinstance(p, SensoryPacket):
+                continue
 
-            self._buffer.append({
-                "key": f"{p['channel']}:{p.get('region', 'global')}",
-                "strength": p.get("value", 0.0),
-                "confidence": confidence,
-                "repetition": p.get("repetition", 0.0),
-            })
+            # Coherence gate (pre-semantic)
+            if p.coherence < 0.4:
+                continue
 
-        # Very early frame emergence (still pre-meaning)
-        if self._buffer:
-            self.active = self._buffer[-1]["key"]
+            self.open(
+                kind="sensory",
+                data={
+                    "modality": p.modality,
+                    "body_region": p.body_region,
+                    "intensity": p.intensity,
+                    "coherence": p.coherence,
+                    "repetition": p.repetition,
+                },
+            )
+
+    # --------------------------------------------------
+    # FRAME OPENING
+    # --------------------------------------------------
+
+    def open(self, *, kind: str, data: Dict[str, Any]) -> None:
+        """
+        Open a new frame.
+
+        Frames are inert containers.
+        They do NOT decide meaning or action.
+        """
+
+        frame = {
+            "kind": kind,
+            "data": data,
+            "tick_opened": len(self.frames),
+        }
+
+        self.frames.append(frame)
+        self.active = frame
+
+    # --------------------------------------------------
+    # READ-ONLY INTROSPECTION
+    # --------------------------------------------------
+
+    def snapshot(self) -> Dict[str, Any]:
+        """
+        Safe snapshot for UI / debugging.
+        """
+        return {
+            "frame_count": len(self.frames),
+            "active_frame": self.active,
+        }
