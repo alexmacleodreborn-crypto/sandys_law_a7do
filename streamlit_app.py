@@ -1,5 +1,5 @@
 import streamlit as st
-from life_cycle import LifeCycle
+from sandys_law_a7do.life_cycle import LifeCycle
 
 # --------------------------------------------------
 # Page config
@@ -40,27 +40,29 @@ trace = lc.engine.state.get("development_trace")
 # ==================================================
 st.header("Lifecycle Status")
 
-st.json({
-    "Ticks": snap["ticks"],
-    "Born": snap["birth"]["born"] if snap.get("birth") else False,
-    "Birth Reason": snap["birth"]["reason"] if snap.get("birth") else None,
-})
+st.json(
+    {
+        "Ticks": snap["ticks"],
+        "Born": snap["birth"]["born"] if snap.get("birth") else False,
+        "Birth Reason": snap["birth"]["reason"] if snap.get("birth") else None,
+    }
+)
 
 # ==================================================
-# VITAL SYSTEMS (CLINICAL STYLE)
+# VITAL SYSTEMS
 # ==================================================
 st.header("🫀 Vital Systems")
 
-col_a, col_b = st.columns(2)
+c1, c2 = st.columns(2)
 
-with col_a:
+with c1:
     st.subheader("Womb")
     if snap.get("womb"):
         st.json(snap["womb"])
     else:
         st.info("Womb inactive")
 
-with col_b:
+with c2:
     st.subheader("Umbilical Link")
     if snap.get("umbilical"):
         st.json(snap["umbilical"])
@@ -73,48 +75,45 @@ with col_b:
 st.header("🧬 Development Dashboard")
 
 if trace and len(trace["ticks"]) > 1:
-
-    # -------------------------------
-    # Heart & Rhythm
-    # -------------------------------
     st.subheader("🫀 Cardio-Rhythmic Development")
-    st.line_chart({
-        "Heartbeat": trace["heartbeat"],
-        "Rhythmic Coupling": trace["rhythmic_coupling"],
-    })
+    st.write(
+        {
+            "heartbeat (last 10)": trace["heartbeat"][-10:],
+            "rhythmic coupling (last 10)": trace["rhythmic_coupling"][-10:],
+        }
+    )
 
-    # -------------------------------
-    # Brain
-    # -------------------------------
     st.subheader("🧠 Neural Coherence Formation")
-    st.area_chart({
-        "Brain Coherence Capacity": trace["brain_coherence"],
-    })
+    st.write(trace["brain_coherence"][-20:])
 
-    # -------------------------------
-    # Body Growth
-    # -------------------------------
     st.subheader("🦴 Somatic Development")
-    st.line_chart({
-        "Body Growth": trace["body_growth"],
-        "Limb Differentiation": trace["limb_growth"],
-    })
+    st.write(
+        {
+            "body_growth": trace["body_growth"][-20:],
+            "limb_growth": trace["limb_growth"][-20:],
+        }
+    )
 
-    # -------------------------------
-    # Current Metrics
-    # -------------------------------
     st.subheader("Current Development State")
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
+    m1, m2, m3 = st.columns(3)
+    with m1:
         st.metric("Body Growth", round(trace["body_growth"][-1], 3))
-    with c2:
+    with m2:
         st.metric("Limb Growth", round(trace["limb_growth"][-1], 3))
-    with c3:
+    with m3:
         st.metric("Brain Coherence", round(trace["brain_coherence"][-1], 3))
-
 else:
     st.info("Development data will appear after a few ticks.")
+
+# ==================================================
+# SENSORY READINESS
+# ==================================================
+st.header("👁️ Sensory Readiness")
+
+if snap.get("sensory"):
+    st.json(snap["sensory"])
+else:
+    st.info("Sensory systems offline.")
 
 # ==================================================
 # BODY MAP
@@ -133,15 +132,18 @@ for c in candidates:
     if "limb" in c.get("regions", []):
         limbs.append(c)
 
-def stability_colour(v):
+
+def stability_colour(v: float) -> str:
     if v >= 0.9:
         return "🟩"
     if v >= 0.6:
         return "🟨"
     return "🟥"
 
-def support_bar(s):
+
+def support_bar(s: int) -> str:
     return "█" * min(10, max(1, s // 50))
+
 
 if core or limbs:
     l, c, r = st.columns(3)
@@ -149,24 +151,36 @@ if core or limbs:
     with l:
         st.markdown("### 🦾 Limb")
         if limbs:
-            st.markdown(f"Stability: {stability_colour(limbs[0]['stability'])}")
-            st.markdown(f"Support: `{support_bar(limbs[0]['support'])}`")
+            st.markdown(
+                f"Stability: {stability_colour(limbs[0]['stability'])}"
+            )
+            st.markdown(
+                f"Support: `{support_bar(limbs[0]['support'])}`"
+            )
         else:
             st.markdown("_Not yet differentiated_")
 
     with c:
         st.markdown("### 🧠 Core")
         if core:
-            st.markdown(f"Stability: {stability_colour(core['stability'])}")
-            st.markdown(f"Support: `{support_bar(core['support'])}`")
+            st.markdown(
+                f"Stability: {stability_colour(core['stability'])}"
+            )
+            st.markdown(
+                f"Support: `{support_bar(core['support'])}`"
+            )
         else:
             st.markdown("_Not yet formed_")
 
     with r:
         st.markdown("### 🦿 Limb")
         if len(limbs) > 1:
-            st.markdown(f"Stability: {stability_colour(limbs[1]['stability'])}")
-            st.markdown(f"Support: `{support_bar(limbs[1]['support'])}`")
+            st.markdown(
+                f"Stability: {stability_colour(limbs[1]['stability'])}"
+            )
+            st.markdown(
+                f"Support: `{support_bar(limbs[1]['support'])}`"
+            )
         elif limbs:
             st.markdown("_Differentiating_")
         else:
