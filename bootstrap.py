@@ -72,18 +72,31 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "embodiment_ledger": EmbodimentLedger(),
 
         # -----------------
-        # Birth (FIXED)
+        # Birth (authoritative)
         # -----------------
         "birth_criteria": BirthCriteria(),
         "birth_transition": BirthTransitionEngine(),
         "birth_state": None,
 
         # -----------------
-        # Structural channels (written by tick)
+        # Structural channels (written by tick engine)
         # -----------------
         "last_coherence": 0.0,
         "last_fragmentation": 0.0,
         "structural_load": 0.0,
+
+        # -----------------
+        # Development trace (VISUALISATION ONLY)
+        # -----------------
+        "development_trace": {
+            "ticks": [],
+            "heartbeat": [],
+            "ambient_load": [],
+            "stability": [],
+            "brain_coherence": [],
+            "body_growth": [],
+            "limb_growth": [],
+        },
 
         # -----------------
         # Cached views
@@ -109,7 +122,9 @@ def system_snapshot(state: dict) -> dict:
     load = float(state.get("structural_load", 0.0))
     stability = coherence * (1.0 - load)
 
+    # -----------------
     # Gates
+    # -----------------
     gates = {}
     ge = state.get("gate_engine")
     if ge:
@@ -120,14 +135,18 @@ def system_snapshot(state: dict) -> dict:
         except Exception:
             pass
 
+    # -----------------
     # Embodiment summary
+    # -----------------
     embodiment = None
     try:
         embodiment = summarize_embodiment(state["embodiment_ledger"])
     except Exception:
         pass
 
-    # Womb
+    # -----------------
+    # Womb snapshot
+    # -----------------
     womb = None
     ws = state.get("last_womb_state")
     if ws:
