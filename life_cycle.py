@@ -1,7 +1,7 @@
 from __future__ import annotations
 from enum import Enum
 
-from sandys_law_a7do.engine.tick_engine import TickEngine
+from engine.tick_engine import TickEngine
 from world.world_state import make_default_world
 
 
