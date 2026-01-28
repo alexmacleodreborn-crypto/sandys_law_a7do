@@ -1,20 +1,45 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 
+# ============================================================
+# TOWN PROFILE (GLOBAL CONTEXT)
+# ============================================================
+
 @dataclass(frozen=True)
 class TownProfile:
+    """
+    Global environmental context.
+
+    No agents.
+    No memory.
+    No time.
+    No semantics.
+
+    This defines the *background reality* A7DO is born into.
+    """
+
     name: str
     population: int
     base_temperature: float
-    base_noise: float
-    season: str
+    ambient_noise: float
+    daylight_level: float
 
+    # --------------------------------------------------------
+    # REQUIRED DEFAULT CONSTRUCTOR ✅
+    # --------------------------------------------------------
 
-def make_default_town() -> TownProfile:
-    return TownProfile(
-        name="OriginTown",
-        population=1200,
-        base_temperature=0.2,
-        base_noise=0.15,
-        season="spring",
-    )
+    @classmethod
+    def default(cls) -> "TownProfile":
+        """
+        Minimal valid town.
+        Used for birth / Phase 0.
+        """
+        return cls(
+            name="Unnamed Town",
+            population=0,
+            base_temperature=0.0,
+            ambient_noise=0.0,
+            daylight_level=0.0,
+        )
