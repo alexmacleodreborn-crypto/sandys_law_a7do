@@ -127,9 +127,6 @@ trace = lc.engine.state.get("development_trace")
 
 if trace and len(trace.get("ticks", [])) > 1:
 
-    # -------------------------------
-    # Gestation Timeline
-    # -------------------------------
     st.subheader("Gestation Timeline")
 
     st.line_chart({
@@ -141,18 +138,12 @@ if trace and len(trace.get("ticks", [])) > 1:
     if snap.get("birth"):
         st.caption(f"Birth occurred at tick {snap['birth']['tick']}")
 
-    # -------------------------------
-    # Proto-Brain Development
-    # -------------------------------
     st.subheader("Proto-Brain Coherence (Pre-Cognitive)")
 
     st.area_chart({
         "Coherence Capacity": trace["brain_coherence"],
     })
 
-    # -------------------------------
-    # Embodiment Growth
-    # -------------------------------
     st.subheader("Embodiment Growth")
 
     st.line_chart({
@@ -160,20 +151,14 @@ if trace and len(trace.get("ticks", [])) > 1:
         "Limb Differentiation": trace["limb_growth"],
     })
 
-    # -------------------------------
-    # Current Development Metrics
-    # -------------------------------
     st.subheader("Current Development State")
 
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
+    c1, c2, c3 = st.columns(3)
+    with c1:
         st.metric("Body Growth", round(trace["body_growth"][-1], 3))
-
-    with col2:
+    with c2:
         st.metric("Limb Growth", round(trace["limb_growth"][-1], 3))
-
-    with col3:
+    with c3:
         st.metric("Brain Coherence", round(trace["brain_coherence"][-1], 3))
 
 else:
@@ -193,7 +178,6 @@ limbs = []
 for c in candidates:
     if c.get("kind") != "ownership":
         continue
-
     regions = c.get("regions", [])
     if "core" in regions:
         core = c
@@ -243,3 +227,16 @@ if core or limbs:
             st.markdown("_Not yet differentiated_")
 else:
     st.info("Embodiment not yet established.")
+
+# ==================================================
+# SENSORY READINESS (NEW)
+# ==================================================
+
+st.header("👁️ Sensory Readiness")
+
+sr = snap.get("sensory_readiness")
+
+if sr:
+    st.json(sr)
+else:
+    st.info("Sensory readiness not yet initialised.")
