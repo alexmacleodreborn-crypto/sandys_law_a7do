@@ -25,7 +25,7 @@ def step_tick(state: dict) -> None:
     scuttling.step()
 
     # ------------------------------------------------
-    # STRUCTURAL METRICS (simple + conservative)
+    # STRUCTURAL METRICS
     # ------------------------------------------------
     state["last_stability"] = womb_state.rhythmic_stability
     state["last_load"] = womb_state.ambient_load
@@ -43,3 +43,21 @@ def step_tick(state: dict) -> None:
                 "Z": state["last_fragmentation"],
             }
         )
+
+
+class TickEngine:
+    """
+    Thin adapter around the canonical step_tick().
+
+    This exists ONLY to provide a stable object interface
+    for LifeCycle and visualization layers.
+    """
+
+    def __init__(self, state: dict | None = None):
+        self.state = state if state is not None else system_snapshot()
+
+    def tick(self) -> None:
+        step_tick(self.state)
+
+    def snapshot(self) -> dict:
+        return self.state
