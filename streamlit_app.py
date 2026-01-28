@@ -54,7 +54,7 @@ st.json({
 })
 
 # --------------------------------------------------
-# Womb State (pre + post birth snapshot)
+# Womb State
 # --------------------------------------------------
 
 st.header("Womb State")
@@ -140,83 +140,7 @@ if trace and len(trace.get("ticks", [])) > 1:
 
     if snap.get("birth"):
         st.caption(f"Birth occurred at tick {snap['birth']['tick']}")
-# ==================================================
-# BODY MAP (STRUCTURAL EMBODIMENT)
-# ==================================================
 
-st.header("🦴 Body Map")
-
-candidates = snap.get("scuttling_candidates", [])
-
-# Pull ownership regions
-core = None
-limbs = []
-
-for c in candidates:
-    if c.get("kind") != "ownership":
-        continue
-
-    regions = c.get("regions", [])
-    if "core" in regions:
-        core = c
-    if "limb" in regions:
-        limbs.append(c)
-
-# ---------- helpers ----------
-
-def stability_colour(stability: float) -> str:
-    if stability >= 0.9:
-        return "🟩"
-    if stability >= 0.6:
-        return "🟨"
-    return "🟥"
-
-def support_bar(support: int) -> str:
-    blocks = min(10, max(1, support // 50))
-    return "█" * blocks
-
-# ---------- render ----------
-
-if core or limbs:
-    col_l, col_c, col_r = st.columns([1, 1, 1])
-
-    # LEFT LIMB
-    with col_l:
-        if limbs:
-            limb = limbs[0]
-            st.markdown("### 🦾 Limb")
-            st.markdown(f"Stability: {stability_colour(limb['stability'])}")
-            st.markdown(f"Support: `{support_bar(limb['support'])}`")
-        else:
-            st.markdown("### 🦾 Limb")
-            st.markdown("_Not yet differentiated_")
-
-    # CORE
-    with col_c:
-        if core:
-            st.markdown("### 🧠 Core")
-            st.markdown(f"Stability: {stability_colour(core['stability'])}")
-            st.markdown(f"Support: `{support_bar(core['support'])}`")
-        else:
-            st.markdown("### 🧠 Core")
-            st.markdown("_Not yet formed_")
-
-    # RIGHT LIMB (mirror)
-    with col_r:
-        if len(limbs) > 1:
-            limb = limbs[1]
-            st.markdown("### 🦿 Limb")
-            st.markdown(f"Stability: {stability_colour(limb['stability'])}")
-            st.markdown(f"Support: `{support_bar(limb['support'])}`")
-        elif limbs:
-            st.markdown("### 🦿 Limb")
-            st.markdown("_Differentiating_")
-        else:
-            st.markdown("### 🦿 Limb")
-            st.markdown("_Not yet differentiated_")
-else:
-    st.info("Embodiment not yet established.")
-    
     # -------------------------------
     # Proto-Brain Development
     # -------------------------------
@@ -254,3 +178,68 @@ else:
 
 else:
     st.info("Development data will appear after a few ticks.")
+
+# ==================================================
+# BODY MAP (STRUCTURAL EMBODIMENT)
+# ==================================================
+
+st.header("🦴 Body Map")
+
+candidates = snap.get("scuttling_candidates", [])
+
+core = None
+limbs = []
+
+for c in candidates:
+    if c.get("kind") != "ownership":
+        continue
+
+    regions = c.get("regions", [])
+    if "core" in regions:
+        core = c
+    if "limb" in regions:
+        limbs.append(c)
+
+def stability_colour(stability: float) -> str:
+    if stability >= 0.9:
+        return "🟩"
+    if stability >= 0.6:
+        return "🟨"
+    return "🟥"
+
+def support_bar(support: int) -> str:
+    blocks = min(10, max(1, support // 50))
+    return "█" * blocks
+
+if core or limbs:
+    col_l, col_c, col_r = st.columns([1, 1, 1])
+
+    with col_l:
+        st.markdown("### 🦾 Limb")
+        if limbs:
+            limb = limbs[0]
+            st.markdown(f"Stability: {stability_colour(limb['stability'])}")
+            st.markdown(f"Support: `{support_bar(limb['support'])}`")
+        else:
+            st.markdown("_Not yet differentiated_")
+
+    with col_c:
+        st.markdown("### 🧠 Core")
+        if core:
+            st.markdown(f"Stability: {stability_colour(core['stability'])}")
+            st.markdown(f"Support: `{support_bar(core['support'])}`")
+        else:
+            st.markdown("_Not yet formed_")
+
+    with col_r:
+        st.markdown("### 🦿 Limb")
+        if len(limbs) > 1:
+            limb = limbs[1]
+            st.markdown(f"Stability: {stability_colour(limb['stability'])}")
+            st.markdown(f"Support: `{support_bar(limb['support'])}`")
+        elif limbs:
+            st.markdown("_Differentiating_")
+        else:
+            st.markdown("_Not yet differentiated_")
+else:
+    st.info("Embodiment not yet established.")
