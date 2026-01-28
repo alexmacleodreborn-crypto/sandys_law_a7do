@@ -9,6 +9,7 @@ def step_tick(state: dict) -> None:
     - Advance time
     - Run womb physics ONLY pre-birth
     - Accumulate gestation criteria
+    - Record developmental growth trace
     - Execute birth transition exactly once
     - Freeze womb engine AND womb snapshot after birth
     - Evaluate gates post-birth
@@ -21,7 +22,7 @@ def step_tick(state: dict) -> None:
     state["ticks"] += 1
 
     # ------------------------------------------------
-    # PRE-BIRTH: WOMB + GESTATION
+    # PRE-BIRTH: WOMB + GESTATION + DEVELOPMENT TRACE
     # ------------------------------------------------
     if state["birth_state"] is None:
         # ---- Womb physics ----
@@ -40,6 +41,31 @@ def step_tick(state: dict) -> None:
             dt=1.0,
             stability=womb_state.rhythmic_stability,
             ambient_load=womb_state.ambient_load,
+        )
+
+        # ------------------------------------------------
+        # DEVELOPMENT TRACE (VISUALISATION ONLY)
+        # ------------------------------------------------
+        trace = state["development_trace"]
+
+        trace["ticks"].append(state["ticks"])
+        trace["heartbeat"].append(womb_state.heartbeat_rate)
+        trace["ambient_load"].append(womb_state.ambient_load)
+        trace["stability"].append(womb_state.rhythmic_stability)
+
+        # Proto-brain coherence (capacity only, no semantics)
+        trace["brain_coherence"].append(
+            womb_state.rhythmic_stability
+            * min(1.0, state["ticks"] / 100.0)
+        )
+
+        # Body growth precedes limbs
+        trace["body_growth"].append(
+            min(1.0, state["ticks"] / criteria.MIN_EXPOSURE_TIME)
+        )
+
+        trace["limb_growth"].append(
+            max(0.0, (state["ticks"] - 20) / criteria.MIN_EXPOSURE_TIME)
         )
 
         # ---- Birth readiness & transition ----
