@@ -1,5 +1,6 @@
 from bootstrap import system_snapshot
 from embodiment.anatomy import grow_anatomy
+from world.world_state import WorldEventType
 
 
 def step_tick(state: dict) -> None:
@@ -16,24 +17,20 @@ def step_tick(state: dict) -> None:
     # PRE-BIRTH (GESTATION)
     # =================================================
     if state["birth_state"] is None:
-        # ---- Womb ----
         womb = state["womb_engine"]
         womb_state = womb.step()
         state["last_womb_state"] = womb_state
 
-        # ---- Umbilical ----
         umb = state["umbilical_link"]
         umb_state = umb.step(womb_active=womb_state.womb_active)
         state["last_umbilical_state"] = umb_state
 
-        # ---- Structural metrics ----
         state["last_coherence"] = womb_state.rhythmic_stability
         state["structural_load"] = (
             womb_state.ambient_load * (1.0 - umb_state.load_transfer * 0.5)
         )
         state["last_fragmentation"] = 1.0 - womb_state.rhythmic_stability
 
-        # ---- Gestation criteria ----
         criteria = state["birth_criteria"]
         criteria.update(
             dt=1.0,
@@ -41,13 +38,13 @@ def step_tick(state: dict) -> None:
             ambient_load=womb_state.ambient_load,
         )
 
-        # ---- Anatomical growth (PHYSICAL BODY) ----
+        # ---- Physical anatomy growth ----
         grow_anatomy(
             anatomy=state["anatomy"],
             stability=womb_state.rhythmic_stability,
         )
 
-        # ---- Observer development trace ----
+        # ---- Observer trace ----
         trace = state["development_trace"]
         trace["ticks"].append(state["ticks"])
         trace["heartbeat"].append(womb_state.heartbeat_rate)
@@ -55,7 +52,8 @@ def step_tick(state: dict) -> None:
         trace["stability"].append(womb_state.rhythmic_stability)
         trace["brain_coherence"].append(state["last_coherence"])
         trace["body_growth"].append(
-            sum(r["growth"] for r in state["anatomy"].values()) / len(state["anatomy"])
+            sum(r["growth"] for r in state["anatomy"].values())
+            / len(state["anatomy"])
         )
         trace["limb_growth"].append(
             (
@@ -68,7 +66,6 @@ def step_tick(state: dict) -> None:
         trace["umbilical_load"].append(umb_state.load_transfer)
         trace["rhythmic_coupling"].append(umb_state.rhythmic_coupling)
 
-        # ---- Birth transition ----
         readiness = criteria.evaluate()
         transition = state["birth_transition"].attempt_transition(
             readiness=readiness,
@@ -88,18 +85,24 @@ def step_tick(state: dict) -> None:
             umb_state.active = False
 
     # =================================================
-    # POST-BIRTH (PROTO-PERCEPTION)
+    # POST-BIRTH — REAL WORLD PIPELINE
     # =================================================
     if state["birth_state"] is not None:
-        # ---- Sensory readiness ramp ----
+        # ---- Sensory readiness ----
         state["sensory_readiness"].step(born=True)
 
-        # ---- Raw environment (noise only) ----
-        raw_input = {
-            "vision": 0.05,
-            "sound": 0.1,
-            "touch": 0.05,
-        }
+        # ---- World step (NO action yet) ----
+        world_events = state["world_runner"].step(action=None)
+
+        # ---- Sensors ----
+        sensor_events = state["sensor_suite"].sense()
+
+        # ---- Convert sensor events → raw input ----
+        raw_input = {}
+        for e in sensor_events:
+            if e.type != WorldEventType.OBSERVATION:
+                continue
+            raw_input[e.name] = raw_input.get(e.name, 0.0) + 0.1
 
         # ---- Sensory wall ----
         packets = state["sensory_wall"].filter(
@@ -109,9 +112,9 @@ def step_tick(state: dict) -> None:
         )
 
         state["last_sensory_packets"] = packets
-        state["frames"].observe_sensory(packets)
 
-        # ---- Square (repetition) ----
+        # ---- Cognition ingress ----
+        state["frames"].observe_sensory(packets)
         state["square"].observe_packets(packets)
 
         # ---- Gates ----
