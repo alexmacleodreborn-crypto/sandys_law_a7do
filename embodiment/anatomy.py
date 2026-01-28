@@ -1,217 +1,140 @@
-"""
-Anatomy — Passive Biological Structure (LOCKED)
-
-Doctrine:
-- Defines WHAT body parts exist
-- Defines HOW developed they are
-- Does NOT learn
-- Does NOT activate
-- Does NOT couple
-- Does NOT decay
-- Grows deterministically during gestation
-- Freezes structure at birth
-
-This is NOT a body schema.
-This is NOT proprioception.
-This is NOT ownership.
-
-It is anatomy.
-"""
-
-from __future__ import annotations
-from dataclasses import dataclass
 from typing import Dict
 
 
 # ============================================================
-# BASIC REGION
+# DEFAULT ANATOMY
 # ============================================================
 
-@dataclass
-class AnatomyRegion:
+def create_default_anatomy() -> Dict[str, Dict[str, float]]:
     """
-    Passive anatomical region.
-
-    growth:   developmental completion [0.0 → 1.0]
-    stability: structural integrity [0.0 → 1.0]
-    present:  whether the region exists at all
+    Biological anatomy scaffold.
+    Growth and stability are in [0, 1].
     """
-    present: bool = True
-    growth: float = 0.0
-    stability: float = 0.0
-
-    def mature(self, amount: float) -> None:
-        """
-        Deterministic, monotonic growth.
-        """
-        if not self.present:
-            return
-
-        self.growth = min(1.0, self.growth + amount)
-        self.stability = min(1.0, self.stability + amount * 0.8)
-
-
-# ============================================================
-# FULL ANATOMY
-# ============================================================
-
-@dataclass
-class Anatomy:
-    """
-    Complete neonatal anatomical structure.
-
-    Exists BEFORE movement.
-    Exists BEFORE sensation.
-    Exists BEFORE ownership.
-    """
-
-    # --------------------
-    # Core body
-    # --------------------
-    head: AnatomyRegion
-    neck: AnatomyRegion
-    spine: AnatomyRegion
-    torso: AnatomyRegion
-    pelvis: AnatomyRegion
-
-    # --------------------
-    # Face & head organs
-    # --------------------
-    eyes: AnatomyRegion
-    ears: AnatomyRegion
-    nose: AnatomyRegion
-    mouth: AnatomyRegion
-    tongue: AnatomyRegion
-
-    # --------------------
-    # Upper limbs
-    # --------------------
-    left_arm: AnatomyRegion
-    right_arm: AnatomyRegion
-    left_hand: AnatomyRegion
-    right_hand: AnatomyRegion
-    fingers: AnatomyRegion
-
-    # --------------------
-    # Lower limbs
-    # --------------------
-    left_leg: AnatomyRegion
-    right_leg: AnatomyRegion
-    left_foot: AnatomyRegion
-    right_foot: AnatomyRegion
-    toes: AnatomyRegion
-
-    # --------------------
-    # Other biological
-    # --------------------
-    genitalia: AnatomyRegion
-    umbilical: AnatomyRegion
-
-    # ========================================================
-    # GESTATIONAL GROWTH
-    # ========================================================
-
-    def grow(self, *, stability: float) -> None:
-        """
-        Apply one gestational growth step.
-
-        stability is womb rhythmic stability [0.0 → 1.0]
-        """
-
-        base = 0.002 * stability
-
-        # Core develops first
-        self.head.mature(base * 1.5)
-        self.spine.mature(base * 1.4)
-        self.torso.mature(base * 1.4)
-        self.pelvis.mature(base * 1.3)
-        self.neck.mature(base * 1.2)
-
-        # Face
-        self.eyes.mature(base * 1.0)
-        self.ears.mature(base * 1.0)
-        self.nose.mature(base * 0.9)
-        self.mouth.mature(base * 1.1)
-        self.tongue.mature(base * 0.9)
-
-        # Limbs
-        self.left_arm.mature(base * 1.1)
-        self.right_arm.mature(base * 1.1)
-        self.left_hand.mature(base * 1.0)
-        self.right_hand.mature(base * 1.0)
-        self.fingers.mature(base * 0.9)
-
-        self.left_leg.mature(base * 1.0)
-        self.right_leg.mature(base * 1.0)
-        self.left_foot.mature(base * 0.9)
-        self.right_foot.mature(base * 0.9)
-        self.toes.mature(base * 0.8)
-
-        # Other
-        self.genitalia.mature(base * 0.7)
-        self.umbilical.mature(base * 1.6)
-
-
-# ============================================================
-# FACTORY
-# ============================================================
-
-def create_default_anatomy() -> Anatomy:
-    """
-    Create a baseline fetal anatomy.
-    All regions exist but are immature.
-    """
-    def r() -> AnatomyRegion:
-        return AnatomyRegion(present=True, growth=0.0, stability=0.0)
-
-    return Anatomy(
+    parts = [
         # Core
-        head=r(),
-        neck=r(),
-        spine=r(),
-        torso=r(),
-        pelvis=r(),
+        "head",
+        "neck",
+        "spine",
+        "torso",
+        "pelvis",
 
-        # Face
-        eyes=r(),
-        ears=r(),
-        nose=r(),
-        mouth=r(),
-        tongue=r(),
+        # Sensory organs
+        "eyes",
+        "ears",
+        "nose",
+        "mouth",
+        "tongue",
 
         # Upper limbs
-        left_arm=r(),
-        right_arm=r(),
-        left_hand=r(),
-        right_hand=r(),
-        fingers=r(),
+        "left_arm",
+        "right_arm",
+        "left_hand",
+        "right_hand",
+        "left_fingers",
+        "right_fingers",
 
         # Lower limbs
-        left_leg=r(),
-        right_leg=r(),
-        left_foot=r(),
-        right_foot=r(),
-        toes=r(),
+        "left_leg",
+        "right_leg",
+        "left_foot",
+        "right_foot",
+        "left_toes",
+        "right_toes",
 
         # Other
-        genitalia=r(),
-        umbilical=r(),
-    )
+        "skin",
+        "genitalia",
+        "umbilical",
+    ]
+
+    return {
+        p: {"growth": 0.0, "stability": 0.0}
+        for p in parts
+    }
 
 
 # ============================================================
-# READ-ONLY SNAPSHOT (FOR UI)
+# GROWTH SCHEDULE (BIOLOGICAL)
 # ============================================================
 
-def anatomy_snapshot(anatomy: Anatomy) -> Dict[str, Dict[str, float]]:
+# Relative growth priority (higher = earlier / faster)
+GROWTH_PRIORITY = {
+    "head": 1.4,
+    "spine": 1.3,
+    "torso": 1.2,
+    "neck": 1.1,
+    "pelvis": 1.0,
+
+    "eyes": 0.9,
+    "ears": 0.9,
+    "nose": 0.8,
+    "mouth": 0.8,
+    "tongue": 0.7,
+
+    "left_arm": 0.8,
+    "right_arm": 0.8,
+    "left_leg": 0.7,
+    "right_leg": 0.7,
+
+    "left_hand": 0.6,
+    "right_hand": 0.6,
+    "left_foot": 0.6,
+    "right_foot": 0.6,
+
+    "left_fingers": 0.4,
+    "right_fingers": 0.4,
+    "left_toes": 0.4,
+    "right_toes": 0.4,
+
+    "skin": 0.9,
+    "genitalia": 0.3,
+    "umbilical": 1.5,
+}
+
+
+# ============================================================
+# ANATOMY GROWTH ENGINE
+# ============================================================
+
+def grow_anatomy(
+    *,
+    anatomy: Dict[str, Dict[str, float]],
+    stability: float,
+) -> None:
     """
-    Observer-safe snapshot for dashboards.
+    Apply one tick of biological growth.
+    Called ONLY during gestation (pre-birth).
     """
-    snap = {}
-    for name, region in anatomy.__dict__.items():
-        snap[name] = {
-            "present": region.present,
-            "growth": round(region.growth, 3),
-            "stability": round(region.stability, 3),
+
+    for part, data in anatomy.items():
+        priority = GROWTH_PRIORITY.get(part, 0.5)
+
+        # Slow, stability-gated growth
+        delta = 0.002 * stability * priority
+
+        # Growth
+        new_growth = min(1.0, data["growth"] + delta)
+        data["growth"] = new_growth
+
+        # Stability lags growth slightly
+        data["stability"] = min(
+            1.0,
+            data["stability"] + delta * 0.6,
+        )
+
+
+# ============================================================
+# SNAPSHOT (READ-ONLY)
+# ============================================================
+
+def anatomy_snapshot(anatomy: Dict[str, Dict[str, float]]) -> Dict[str, Dict[str, float]]:
+    """
+    UI-safe snapshot.
+    """
+    return {
+        part: {
+            "growth": round(data["growth"], 3),
+            "stability": round(data["stability"], 3),
         }
-    return snap
+        for part, data in anatomy.items()
+    }
