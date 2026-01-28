@@ -109,16 +109,13 @@ grid = []
 for y in range(lc.world.cfg.height):
     row = []
     for x in range(lc.world.cfg.width):
-        if (x, y) == (a.x, a.y):
-            row.append("🧠")
-        else:
-            row.append("⬜")
+        row.append("🧠" if (x, y) == (a.x, a.y) else "⬜")
     grid.append(row)
 
 st.table(grid)
 
 # ==================================================
-# DEVELOPMENT DASHBOARD
+# DEVELOPMENT DASHBOARD (NO ALTAIR)
 # ==================================================
 
 st.header("🧬 Development Dashboard")
@@ -127,28 +124,26 @@ trace = lc.engine.state.get("development_trace")
 
 if trace and len(trace.get("ticks", [])) > 1:
 
-    st.subheader("Gestation Timeline")
+    st.subheader("Gestation Timeline (Raw Signals)")
 
-    st.line_chart({
-        "Heartbeat": trace["heartbeat"],
-        "Rhythmic Stability": trace["stability"],
-        "Ambient Load": trace["ambient_load"],
+    st.write({
+        "heartbeat (last 10)": trace["heartbeat"][-10:],
+        "stability (last 10)": trace["stability"][-10:],
+        "ambient_load (last 10)": trace["ambient_load"][-10:],
     })
 
     if snap.get("birth"):
         st.caption(f"Birth occurred at tick {snap['birth']['tick']}")
 
-    st.subheader("Proto-Brain Coherence (Pre-Cognitive)")
+    st.subheader("Proto-Brain Coherence")
 
-    st.area_chart({
-        "Coherence Capacity": trace["brain_coherence"],
-    })
+    st.write(trace["brain_coherence"][-20:])
 
     st.subheader("Embodiment Growth")
 
-    st.line_chart({
-        "Body Growth": trace["body_growth"],
-        "Limb Differentiation": trace["limb_growth"],
+    st.write({
+        "body_growth": trace["body_growth"][-20:],
+        "limb_growth": trace["limb_growth"][-20:],
     })
 
     st.subheader("Current Development State")
@@ -192,11 +187,10 @@ def stability_colour(stability: float) -> str:
     return "🟥"
 
 def support_bar(support: int) -> str:
-    blocks = min(10, max(1, support // 50))
-    return "█" * blocks
+    return "█" * min(10, max(1, support // 50))
 
 if core or limbs:
-    col_l, col_c, col_r = st.columns([1, 1, 1])
+    col_l, col_c, col_r = st.columns(3)
 
     with col_l:
         st.markdown("### 🦾 Limb")
@@ -229,7 +223,7 @@ else:
     st.info("Embodiment not yet established.")
 
 # ==================================================
-# SENSORY READINESS (NEW)
+# SENSORY READINESS
 # ==================================================
 
 st.header("👁️ Sensory Readiness")
