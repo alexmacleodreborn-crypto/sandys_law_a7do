@@ -1,54 +1,91 @@
 """
-A7DO Life Cycle Orchestrator
-===========================
+A7DO Full Life Cycle
+===================
 
-Single authoritative execution spine for A7DO.
+This is the single authoritative execution spine.
 
-Enforces:
-- One clock (TickEngine)
-- Phase separation (Womb → Birth → Living)
-- Deterministic world evolution (Phase 0 compliant)
-- No hidden side-effects
+Properties:
+- One clock
+- Deterministic world
+- Phase separation
+- Irreversible birth
+- First embodied movement post-birth
 
-World remains pure physics + events.
-Mind interprets; world does not think.
+World = physics only
+Mind = interpretation only
+Agency = gated
 """
+
+from typing import Optional, Tuple
+import random
+
+# --------------------------------------------------
+# Core clock
+# --------------------------------------------------
 
 from engine.tick_engine import TickEngine
 
+# --------------------------------------------------
 # Genesis / Phases
+# --------------------------------------------------
+
 from genesis.phase import Phase
 from genesis.prebirth.phases import WOMB
 from genesis.birth.criteria import birth_ready
 from genesis.birth.transition import BirthTransition
 
-# Core equilibrium
+# --------------------------------------------------
+# Equilibrium core
+# --------------------------------------------------
+
 from square.state import SquareState
 
+# --------------------------------------------------
 # World (Phase 0)
+# --------------------------------------------------
+
 from world.world_state import make_default_world
 from world.world_runner import WorldRunner
 
-# Being / Embodiment
+# --------------------------------------------------
+# Embodiment
+# --------------------------------------------------
+
 from embodiment.boundaries import Boundaries
 from embodiment.ownership import Ownership
 
-# Mind & memory
+# --------------------------------------------------
+# Mind & Memory
+# --------------------------------------------------
+
 from mind.coherence import Coherence
 from frames.store import FrameStore
 from memory.structural_memory import StructuralMemory
 
+# --------------------------------------------------
 # Accounting
+# --------------------------------------------------
+
 from accounting.accountant import Accountant
 
-# Integration loops
+# --------------------------------------------------
+# Integration
+# --------------------------------------------------
+
 from integration.perception_loop import perception_loop
 from integration.phase1_loop import phase1_loop
 from integration.phase2_loop import phase2_loop
 
+# --------------------------------------------------
 # Gates
+# --------------------------------------------------
+
 from gates.gate_manager import GateManager
 
+
+# ==================================================
+# LIFE CYCLE
+# ==================================================
 
 class LifeCycle:
     """
@@ -56,7 +93,7 @@ class LifeCycle:
     """
 
     def __init__(self):
-        # ---------------- Core ----------------
+        # ---------------- Clock ----------------
         self.square = SquareState()
         self.engine = TickEngine(square=self.square)
 
@@ -68,7 +105,7 @@ class LifeCycle:
         self.boundaries = Boundaries()
         self.ownership = Ownership()
 
-        # ---------------- Mind & Memory ----------------
+        # ---------------- Mind ----------------
         self.coherence = Coherence()
         self.frames = FrameStore()
         self.memory = StructuralMemory()
@@ -81,30 +118,37 @@ class LifeCycle:
         self.birth_transition = BirthTransition()
         self.born = False
 
+        # ---------------- Agency ----------------
+        self.last_action: Optional[Tuple[int, int]] = None
+
         # Gates closed at start
         GateManager.close_all()
 
-        # Engine phase binding
+        # Bind phase to clock
         self.engine.set_phase(WOMB)
 
     # ==================================================
-    # One heartbeat of existence
+    # ONE HEARTBEAT
     # ==================================================
 
     def tick(self):
         # Advance time (only clock)
         self.engine.tick()
 
-        # Phase-0 world step (no action in womb)
-        self.world_runner.step(action=None)
+        # Decide action (only post-birth)
+        action = self._decide_action() if self.born else None
 
+        # Advance world physics (Phase 0 compliant)
+        self.world_runner.step(action=action)
+
+        # Phase-specific processing
         if not self.born:
             self._womb_step()
         else:
             self._living_step()
 
     # ==================================================
-    # WOMB (Pre-birth)
+    # WOMB PHASE
     # ==================================================
 
     def _womb_step(self):
@@ -115,7 +159,7 @@ class LifeCycle:
             mind=self.coherence,
         )
 
-        # Frames: fragments only
+        # Fragment frames only
         self.frames.update(fragment_only=True)
 
         # Memory crystallization
@@ -124,7 +168,7 @@ class LifeCycle:
         # Equilibrium evolution
         self.square.update()
 
-        # Accounting without agency
+        # Self-measurement without agency
         self.accountant.update(
             frames=self.frames,
             memory=self.memory,
@@ -136,7 +180,7 @@ class LifeCycle:
             self._birth()
 
     # ==================================================
-    # BIRTH (Irreversible)
+    # BIRTH EVENT (IRREVERSIBLE)
     # ==================================================
 
     def _birth(self):
@@ -151,11 +195,11 @@ class LifeCycle:
         self.engine.set_phase(self.phase.current)
 
     # ==================================================
-    # POST-BIRTH (Living System)
+    # POST-BIRTH LIFE
     # ==================================================
 
     def _living_step(self):
-        # Phase-specific integration
+        # Phase integration
         if self.phase.is_phase1():
             phase1_loop(
                 world=self.world,
@@ -169,11 +213,11 @@ class LifeCycle:
                 mind=self.coherence,
             )
 
-        # Embodiment
+        # Embodiment update
         self.boundaries.update(self.world)
         self.ownership.update(self.boundaries)
 
-        # Frame construction
+        # Full frame construction
         self.frames.update(
             embodiment=self.boundaries,
             mind=self.coherence,
@@ -194,7 +238,35 @@ class LifeCycle:
         self.square.update()
 
     # ==================================================
-    # Run loop
+    # ACTION SELECTION (INFANT REFLEX)
+    # ==================================================
+
+    def _decide_action(self) -> Optional[Tuple[int, int]]:
+        """
+        Phase-1 infant reflex:
+        - Random local movement
+        - No planning
+        - No memory lookup
+        """
+
+        # Only move if motor gate is open
+        if not GateManager.is_open("motor"):
+            return None
+
+        # Simple reflex directions
+        directions = [
+            (1, 0),
+            (-1, 0),
+            (0, 1),
+            (0, -1),
+        ]
+
+        action = random.choice(directions)
+        self.last_action = action
+        return action
+
+    # ==================================================
+    # RUN LOOP
     # ==================================================
 
     def run(self, max_ticks: int | None = None):
