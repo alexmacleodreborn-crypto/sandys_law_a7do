@@ -10,7 +10,7 @@ def step_tick(state: dict) -> None:
     - Run womb physics ONLY pre-birth
     - Accumulate gestation criteria
     - Execute birth transition exactly once
-    - Freeze womb after birth
+    - Freeze womb engine AND womb snapshot after birth
     - Evaluate gates post-birth
     - Run scuttling continuously
     """
@@ -58,8 +58,12 @@ def step_tick(state: dict) -> None:
                 tick=state["ticks"],
             )
 
-            # 🔒 FREEZE WOMB FOREVER
+            # 🔒 FREEZE WOMB ENGINE
             state["womb_engine"].womb_active = False
+
+            # 🔒 FREEZE LAST WOMB SNAPSHOT (UI CONSISTENCY)
+            if state.get("last_womb_state") is not None:
+                state["last_womb_state"].womb_active = False
 
     # ------------------------------------------------
     # POST-BIRTH: GATE EVALUATION
