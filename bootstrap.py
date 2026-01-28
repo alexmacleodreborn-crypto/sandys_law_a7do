@@ -1,11 +1,5 @@
 """
 A7DO Bootstrap — Authoritative System Constructor
-
-Responsibilities:
-- Construct system state
-- Own time progression (via tick engine)
-- Expose snapshot() for UI
-- Coordinate prebirth, scuttling, embodiment, birth
 """
 
 from __future__ import annotations
@@ -39,15 +33,17 @@ from embodiment.ledger.ledger import EmbodimentLedger
 from embodiment.bridge.accountant import summarize_embodiment
 from embodiment.growth_model import EmbodimentGrowthModel
 
+# -------------------------
+# Sensory
+# -------------------------
+from sensory.readiness import SensoryReadiness
+
 
 # ============================================================
 # SYSTEM CONSTRUCTOR
 # ============================================================
 
 def build_system() -> Tuple[Callable[[], dict], dict]:
-    """
-    Construct the full A7DO system.
-    """
 
     state: Dict[str, Any] = {
         # -----------------
@@ -72,6 +68,11 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "embodiment_growth": EmbodimentGrowthModel(),
 
         # -----------------
+        # Sensory (NEW)
+        # -----------------
+        "sensory_readiness": SensoryReadiness(),
+
+        # -----------------
         # Birth (authoritative)
         # -----------------
         "birth_criteria": BirthCriteria(),
@@ -79,14 +80,14 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "birth_state": None,
 
         # -----------------
-        # Structural channels (written by tick)
+        # Structural channels
         # -----------------
         "last_coherence": 0.0,
         "last_fragmentation": 0.0,
         "structural_load": 0.0,
 
         # -----------------
-        # Development trace (VISUALISATION ONLY)
+        # Development trace (visual only)
         # -----------------
         "development_trace": {
             "ticks": [],
@@ -143,7 +144,7 @@ def system_snapshot(state: dict) -> dict:
     except Exception:
         pass
 
-    # Womb snapshot
+    # Womb
     womb = None
     ws = state.get("last_womb_state")
     if ws:
@@ -154,7 +155,7 @@ def system_snapshot(state: dict) -> dict:
             "womb_active": ws.womb_active,
         }
 
-    # Umbilical snapshot
+    # Umbilical
     umbilical = None
     us = state.get("last_umbilical_state")
     if us:
@@ -178,6 +179,7 @@ def system_snapshot(state: dict) -> dict:
         "embodiment": embodiment,
         "womb": womb,
         "umbilical": umbilical,
+        "sensory": state["sensory_readiness"].snapshot(),
         "birth": (
             {
                 "born": state["birth_state"].born,
