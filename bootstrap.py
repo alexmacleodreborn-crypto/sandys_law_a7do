@@ -1,11 +1,5 @@
 """
 A7DO Bootstrap — Authoritative System Constructor
-
-Responsibilities:
-- Construct system state
-- Own time progression (via tick engine)
-- Expose snapshot() for UI
-- Coordinate prebirth, scuttling, embodiment, birth
 """
 
 from __future__ import annotations
@@ -38,6 +32,11 @@ from embodiment.ledger.ledger import EmbodimentLedger
 from embodiment.bridge.accountant import summarize_embodiment
 from embodiment.growth_model import EmbodimentGrowthModel
 
+# -------------------------
+# Sensory readiness
+# -------------------------
+from embodiment.sensory.readiness import SensoryReadiness
+
 
 # ============================================================
 # SYSTEM CONSTRUCTOR
@@ -68,6 +67,7 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "scuttling_engine": ScuttlingEngine(),
         "embodiment_ledger": EmbodimentLedger(),
         "embodiment_growth": EmbodimentGrowthModel(),
+        "sensory_readiness": SensoryReadiness(),
 
         # -----------------
         # Birth (authoritative)
@@ -84,7 +84,7 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "structural_load": 0.0,
 
         # -----------------
-        # Development trace (VISUALISATION ONLY)
+        # Development trace (visualisation only)
         # -----------------
         "development_trace": {
             "ticks": [],
@@ -172,4 +172,5 @@ def system_snapshot(state: dict) -> dict:
             else None
         ),
         "scuttling_candidates": state["scuttling_engine"].candidates_snapshot(),
+        "sensory_readiness": state["sensory_readiness"].snapshot(),
     }
