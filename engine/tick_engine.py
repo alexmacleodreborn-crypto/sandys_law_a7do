@@ -1,5 +1,3 @@
-# engine/tick_engine.py
-
 from bootstrap import system_snapshot
 from embodiment.anatomy import grow_anatomy
 
@@ -7,18 +5,6 @@ from embodiment.anatomy import grow_anatomy
 def step_tick(state: dict) -> None:
     """
     THE ONLY CLOCK IN THE SYSTEM
-
-    Responsibilities:
-    - Advance time
-    - Run womb physics ONLY pre-birth
-    - Maintain umbilical life support
-    - Accumulate gestation criteria
-    - Grow anatomical body
-    - Execute birth transition exactly once
-    - Freeze womb + umbilical at engine level
-    - Ramp sensory readiness post-birth
-    - Gate perception → frames
-    - Run scuttling continuously
     """
 
     # =================================================
@@ -30,24 +16,24 @@ def step_tick(state: dict) -> None:
     # PRE-BIRTH (GESTATION)
     # =================================================
     if state["birth_state"] is None:
-        # ---- Womb physics (ENGINE owns activity) ----
-        womb_engine = state["womb_engine"]
-        womb_state = womb_engine.step()
+        # ---- Womb ----
+        womb = state["womb_engine"]
+        womb_state = womb.step()
         state["last_womb_state"] = womb_state
 
-        # ---- Umbilical life support ----
-        umb_engine = state["umbilical_link"]
-        umb_state = umb_engine.step(womb_active=womb_engine.active)
+        # ---- Umbilical ----
+        umb = state["umbilical_link"]
+        umb_state = umb.step(womb_active=womb_state.womb_active)
         state["last_umbilical_state"] = umb_state
 
-        # ---- Structural metrics (umbilical buffers load) ----
+        # ---- Structural metrics ----
         state["last_coherence"] = womb_state.rhythmic_stability
         state["structural_load"] = (
             womb_state.ambient_load * (1.0 - umb_state.load_transfer * 0.5)
         )
         state["last_fragmentation"] = 1.0 - womb_state.rhythmic_stability
 
-        # ---- Gestation criteria accumulation ----
+        # ---- Gestation criteria ----
         criteria = state["birth_criteria"]
         criteria.update(
             dt=1.0,
@@ -55,13 +41,34 @@ def step_tick(state: dict) -> None:
             ambient_load=womb_state.ambient_load,
         )
 
-        # ---- Anatomical growth (BIOLOGICAL BODY) ----
+        # ---- Anatomical growth (PHYSICAL BODY) ----
         grow_anatomy(
             anatomy=state["anatomy"],
             stability=womb_state.rhythmic_stability,
         )
 
-        # ---- Birth evaluation ----
+        # ---- Observer development trace ----
+        trace = state["development_trace"]
+        trace["ticks"].append(state["ticks"])
+        trace["heartbeat"].append(womb_state.heartbeat_rate)
+        trace["ambient_load"].append(womb_state.ambient_load)
+        trace["stability"].append(womb_state.rhythmic_stability)
+        trace["brain_coherence"].append(state["last_coherence"])
+        trace["body_growth"].append(
+            sum(r["growth"] for r in state["anatomy"].values()) / len(state["anatomy"])
+        )
+        trace["limb_growth"].append(
+            (
+                state["anatomy"]["left_arm"]["growth"]
+                + state["anatomy"]["right_arm"]["growth"]
+                + state["anatomy"]["left_leg"]["growth"]
+                + state["anatomy"]["right_leg"]["growth"]
+            ) / 4
+        )
+        trace["umbilical_load"].append(umb_state.load_transfer)
+        trace["rhythmic_coupling"].append(umb_state.rhythmic_coupling)
+
+        # ---- Birth transition ----
         readiness = criteria.evaluate()
         transition = state["birth_transition"].attempt_transition(
             readiness=readiness,
@@ -77,36 +84,37 @@ def step_tick(state: dict) -> None:
                 tick=state["ticks"],
             )
 
-            # 🔒 CRITICAL FIX: freeze ENGINES, not snapshots
-            womb_engine.active = False
-            umb_engine.active = False
+            womb_state.womb_active = False
+            umb_state.active = False
 
     # =================================================
-    # POST-BIRTH — SENSORY WALL → FRAMES
+    # POST-BIRTH (PROTO-PERCEPTION)
     # =================================================
     if state["birth_state"] is not None:
         # ---- Sensory readiness ramp ----
         state["sensory_readiness"].step(born=True)
 
-        # ---- Environmental noise (NOT perception yet) ----
+        # ---- Raw environment (noise only) ----
         raw_input = {
-            "vision": 0.05,   # shadow/light only
-            "sound": 0.10,    # muffled noise
-            "touch": 0.05,    # diffuse contact
+            "vision": 0.05,
+            "sound": 0.1,
+            "touch": 0.05,
         }
 
-        sensory_wall = state.get("sensory_wall")
-        if sensory_wall:
-            packets = sensory_wall.filter(
-                raw_input=raw_input,
-                anatomy=state["anatomy"],
-                sensory_levels=state["sensory_readiness"].snapshot(),
-            )
+        # ---- Sensory wall ----
+        packets = state["sensory_wall"].filter(
+            raw_input=raw_input,
+            anatomy=state["anatomy"],
+            sensory_levels=state["sensory_readiness"].snapshot(),
+        )
 
-            state["last_sensory_packets"] = packets
-            state["frames"].observe_sensory(packets)
+        state["last_sensory_packets"] = packets
+        state["frames"].observe_sensory(packets)
 
-        # ---- Gate evaluation AFTER perception ----
+        # ---- Square (repetition) ----
+        state["square"].observe_packets(packets)
+
+        # ---- Gates ----
         state["gate_engine"].evaluate(
             coherence=state["last_coherence"],
             fragmentation=state["last_fragmentation"],
@@ -116,14 +124,10 @@ def step_tick(state: dict) -> None:
         )
 
     # =================================================
-    # SCUTTLING (ALWAYS RUNS)
+    # SCUTTLING (ALWAYS)
     # =================================================
     state["scuttling_engine"].step()
 
-
-# =====================================================
-# ENGINE WRAPPER
-# =====================================================
 
 class TickEngine:
     def __init__(self, state: dict | None = None):
