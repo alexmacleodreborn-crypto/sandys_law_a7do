@@ -12,7 +12,7 @@ Responsibilities:
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from sandys_law_a7do.gates.rules import (
+from .gates.rules import (
     GateRule,
     GateDecision,
     default_gate_rules,
