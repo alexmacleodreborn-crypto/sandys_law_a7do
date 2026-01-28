@@ -12,7 +12,8 @@ Responsibilities:
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from .gates.rules import (
+# ✅ FIXED: relative import inside package
+from .rules import (
     GateRule,
     GateDecision,
     default_gate_rules,
@@ -67,7 +68,7 @@ class GateEngine:
         }
 
     # -------------------------------------------------
-    # EVALUATION (CALLED FROM bootstrap.close_frame)
+    # EVALUATION
     # -------------------------------------------------
 
     def evaluate(
