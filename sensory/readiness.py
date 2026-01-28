@@ -11,12 +11,12 @@ class SensoryChannel:
 
 class SensoryReadiness:
     """
-    Controls when and how sensory channels become available.
+    Sensory gating controller.
 
     Doctrine:
-    - All senses OFF pre-birth
-    - Gradual ramp post-birth
-    - No semantics, no learning
+    - All sensory channels OFF pre-birth
+    - Gradual ramp-up post-birth
+    - No perception, no learning, no semantics
     """
 
     def __init__(self) -> None:
@@ -32,7 +32,7 @@ class SensoryReadiness:
 
     def step(self, *, born: bool) -> None:
         """
-        Gradually enable senses after birth.
+        Enable and ramp sensory channels after birth.
         """
         if not born:
             return
@@ -42,6 +42,9 @@ class SensoryReadiness:
             ch.readiness = min(1.0, ch.readiness + 0.02)
 
     def snapshot(self) -> Dict[str, float]:
+        """
+        Observer-safe snapshot.
+        """
         return {
             name: ch.readiness if ch.enabled else 0.0
             for name, ch in self.channels.items()
