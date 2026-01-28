@@ -1,4 +1,5 @@
 from bootstrap import system_snapshot
+from embodiment.anatomy import grow_anatomy
 
 
 def step_tick(state: dict) -> None:
@@ -10,7 +11,7 @@ def step_tick(state: dict) -> None:
     - Run womb physics ONLY pre-birth
     - Maintain umbilical life support
     - Accumulate gestation criteria
-    - Grow anatomical body (NEW – critical)
+    - Grow anatomical body (BIOLOGICAL)
     - Delegate embodiment growth computation
     - Execute birth transition exactly once
     - Freeze womb + umbilical after birth
@@ -62,10 +63,12 @@ def step_tick(state: dict) -> None:
         )
 
         # ------------------------------------------------
-        # ANATOMICAL GROWTH (PHYSICAL BODY)  ✅ KEY FIX
+        # BIOLOGICAL ANATOMY GROWTH (PRE-BIRTH ONLY)
         # ------------------------------------------------
-        anatomy = state["anatomy"]
-        anatomy.grow(stability=womb_state.rhythmic_stability)
+        grow_anatomy(
+            anatomy=state["anatomy"],
+            stability=womb_state.rhythmic_stability,
+        )
 
         # ---- Development trace (observer only) ----
         trace = state["development_trace"]
