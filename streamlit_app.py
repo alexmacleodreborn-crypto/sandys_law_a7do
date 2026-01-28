@@ -39,7 +39,7 @@ with col2:
 # Snapshot
 # --------------------------------------------------
 
-snap = lc.snapshot()
+snap = lc.engine.snapshot()
 
 # --------------------------------------------------
 # Lifecycle Status
