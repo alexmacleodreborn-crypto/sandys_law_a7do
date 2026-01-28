@@ -4,14 +4,12 @@ from life_cycle import LifeCycle
 # ==================================================
 # PAGE CONFIG
 # ==================================================
-
 st.set_page_config(layout="wide")
-st.title("A7DO — Development, World & Proto-Cognition Monitor")
+st.title("A7DO — Development, Brain & World Monitor")
 
 # ==================================================
-# PERSISTENT LIFECYCLE
+# LIFECYCLE
 # ==================================================
-
 if "lc" not in st.session_state:
     st.session_state.lc = LifeCycle()
 
@@ -20,135 +18,128 @@ lc = st.session_state.lc
 # ==================================================
 # CONTROLS
 # ==================================================
-
 col1, col2 = st.columns(2)
+
 with col1:
     if st.button("Tick"):
         lc.tick()
+
 with col2:
     if st.button("Run 10 Ticks"):
         for _ in range(10):
             lc.tick()
 
+# ==================================================
+# SNAPSHOT
+# ==================================================
 snap = lc.engine.snapshot()
+state = lc.engine.state  # internal read-only for graphs only
 
 # ==================================================
 # LIFECYCLE STATUS
 # ==================================================
+st.header("Lifecycle Status")
 
-st.header("🧬 Lifecycle Status")
 st.json({
     "Ticks": snap["ticks"],
-    "Born": snap["birth"]["born"] if snap["birth"] else False,
-    "Birth Reason": snap["birth"]["reason"] if snap["birth"] else None,
+    "Born": snap["birth"]["born"] if snap.get("birth") else False,
+    "Birth Reason": snap["birth"]["reason"] if snap.get("birth") else None,
 })
 
 # ==================================================
-# DEVELOPMENT DASHBOARD
+# DEVELOPMENT DASHBOARD (BRAIN + BODY)
 # ==================================================
+st.header("🧠 Development & Brain Growth")
 
-st.header("🧫 Development Dashboard")
-trace = lc.engine.state["development_trace"]
+trace = state.get("development_trace", {})
 
-if len(trace["ticks"]) > 2:
-    st.line_chart({
-        "Heartbeat": trace["heartbeat"],
-        "Stability": trace["stability"],
-        "Body Growth": trace["body_growth"],
-        "Brain Coherence": trace["brain_coherence"],
-    })
+if trace and len(trace.get("ticks", [])) > 2:
+    col_a, col_b = st.columns(2)
+
+    with col_a:
+        st.subheader("Womb Physiology")
+        st.line_chart({
+            "Heartbeat": trace["heartbeat"],
+            "Stability": trace["stability"],
+            "Ambient Load": trace["ambient_load"],
+        })
+
+    with col_b:
+        st.subheader("Brain & Body Formation")
+        st.line_chart({
+            "Brain Coherence": trace["brain_coherence"],
+            "Body Growth": trace["body_growth"],
+            "Limb Growth": trace["limb_growth"],
+        })
 else:
     st.info("Development data accumulating…")
 
 # ==================================================
-# WORLD VIEW (POST-BIRTH)
+# ANATOMY
 # ==================================================
+st.header("🦴 Anatomy (Biological Growth)")
 
-st.header("🗺 World")
+anatomy = snap.get("anatomy", {})
 
-world = snap.get("world")
-
-if world:
-    agent = world["agent"]
-    width = world["cfg"]["width"]
-    height = world["cfg"]["height"]
-
-    # --- Grid ---
-    grid = []
-    for y in range(height):
-        row = []
-        for x in range(width):
-            if (x, y) == (agent["x"], agent["y"]):
-                row.append("🧠")
-            else:
-                row.append("⬜")
-        grid.append(row)
-
-    st.table(grid)
-
-    # --- Physical state ---
-    st.subheader("🧍 Physical State")
-    st.json({
-        "Position": (agent["x"], agent["y"]),
-        "Effort": round(agent["effort"], 3),
-        "Contact": agent["contact"],
-        "Thermal": round(agent["thermal"], 3),
-        "Pain": round(agent["pain"], 3),
-    })
-
+if anatomy:
+    for region, data in anatomy.items():
+        st.markdown(
+            f"**{region.replace('_', ' ').title()}**  \n"
+            f"• Growth: `{data['growth']}`  \n"
+            f"• Stability: `{data['stability']}`"
+        )
 else:
-    st.info("World not yet instantiated (pre-birth)")
+    st.info("Anatomy not yet formed")
+
+# ==================================================
+# DEVELOPMENT SILHOUETTE
+# ==================================================
+st.header("👶 Development Silhouette")
+
+if anatomy:
+    def pct(x): 
+        return f"{int(x * 100)}%"
+
+    st.code(
+        f"""
+              👶
+             ┌─────┐
+             │ 🧠  │  Head: {pct(anatomy['head']['growth'])}
+             └──┬──┘
+                │     Spine: {pct(anatomy['spine']['growth'])}
+             ┌──┴──┐
+             │ 🫀  │  Torso: {pct(anatomy['torso']['growth'])}
+             └─┬──┬┘
+        🦾 Arm: {pct(anatomy['left_arm']['growth'])}   🦾 Arm: {pct(anatomy['right_arm']['growth'])}
+        🦵 Leg: {pct(anatomy['left_leg']['growth'])}   🦵 Leg: {pct(anatomy['right_leg']['growth'])}
+        """,
+        language="text",
+    )
+else:
+    st.info("Silhouette unavailable")
 
 # ==================================================
 # SENSORY READINESS
 # ==================================================
-
 st.header("👁 Sensory Readiness")
-st.json(snap["sensory"])
+
+st.json(snap.get("sensory", {}))
 
 # ==================================================
-# RAW SENSORY PACKETS (OBSERVER ONLY)
+# WORLD VIEW (SAFE)
 # ==================================================
+st.header("🌍 World")
 
-st.header("🌫 Sensory Packets (Pre-Semantic)")
+world = snap.get("world")
 
-packets = lc.engine.state.get("last_sensory_packets", [])
-if packets:
-    for p in packets:
-        st.markdown(
-            f"- **{p.modality}** via *{p.body_region}* | "
-            f"Intensity `{p.intensity}` | "
-            f"Coherence `{p.coherence}` | "
-            f"Repetition `{p.repetition}`"
-        )
+if world:
+    st.json(world)
 else:
-    st.info("No sensory packets emitted yet")
+    st.info("World not yet connected")
 
 # ==================================================
-# ANATOMY
+# SCUTTLING / BODY SCHEMA
 # ==================================================
-
-st.header("🦴 Anatomy")
-
-for region, data in snap["anatomy"].items():
-    st.markdown(
-        f"**{region.replace('_',' ').title()}** — "
-        f"Growth `{data['growth']}` | Stability `{data['stability']}`"
-    )
-
-# ==================================================
-# SQUARE (REPETITION)
-# ==================================================
-
-st.header("◼ Square (Repetition)")
-if snap["square"]:
-    st.json(snap["square"])
-else:
-    st.info("No stable repetitions yet")
-
-# ==================================================
-# BODY SCHEMA (SCUTTLING)
-# ==================================================
-
 st.header("🧠 Body Schema (Scuttling)")
-st.json(snap["scuttling_candidates"])
+
+st.json(snap.get("scuttling_candidates", []))
