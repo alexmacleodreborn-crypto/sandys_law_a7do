@@ -1,5 +1,5 @@
 from typing import List, Optional, Tuple
-from world.world_state import WorldState, WorldEventType
+from world.world_state import WorldState, WorldEvent, WorldEventType
 
 
 class WorldRunner:
@@ -13,13 +13,13 @@ class WorldRunner:
     def __init__(self, world: WorldState):
         self.world = world
 
-    def step(self, action: Optional[Tuple[int, int]] = None) -> List:
+    def step(self, action: Optional[Tuple[int, int]] = None) -> List[WorldEvent]:
         """
         Advance the world by exactly one causal step.
 
         action: (dx, dy) or None
         """
-        events = []
+        events: List[WorldEvent] = []
 
         agent = self.world.agent
         cfg = self.world.cfg
@@ -36,11 +36,13 @@ class WorldRunner:
         dx, dy = action
         nx, ny = agent.x + dx, agent.y + dy
 
-        # Check bounds
+        # --------------------------------------------------
+        # Bounds check
+        # --------------------------------------------------
         if not self.world.in_bounds(nx, ny):
             agent.effort -= cfg.block_cost
             agent.contact = True
-            agent.contact_normals.append((dx, dy))
+            agent.contact_normals.append((-dx, -dy))
 
             events.append(
                 self.world.emit(
@@ -51,11 +53,13 @@ class WorldRunner:
             )
             return events
 
-        # Check wall
+        # --------------------------------------------------
+        # Wall check
+        # --------------------------------------------------
         if self.world.has_wall_between((agent.x, agent.y), (nx, ny)):
             agent.effort -= cfg.block_cost
             agent.contact = True
-            agent.contact_normals.append((dx, dy))
+            agent.contact_normals.append((-dx, -dy))
 
             events.append(
                 self.world.emit(
@@ -66,7 +70,9 @@ class WorldRunner:
             )
             return events
 
+        # --------------------------------------------------
         # Successful move
+        # --------------------------------------------------
         agent.x = nx
         agent.y = ny
         agent.effort -= cfg.move_cost
