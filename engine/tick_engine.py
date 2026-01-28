@@ -35,7 +35,15 @@ def step_tick(state: dict) -> None:
         umb = state["umbilical_link"]
         umb_state = umb.step(womb_active=womb_state.womb_active)
         state["last_umbilical_state"] = umb_state
-
+        
+        # Embodiment growth
+        growth = state["embodiment_growth"].compute(
+        tick=state["ticks"],
+        stability=womb_state.rhythmic_stability,
+        exposure_time=criteria._time_exposed,
+        min_exposure=criteria.MIN_EXPOSURE_TIME,
+        )
+        
         # Structural metrics
         state["last_coherence"] = womb_state.rhythmic_stability
         state["structural_load"] = (
