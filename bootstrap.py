@@ -1,7 +1,5 @@
 """
 A7DO Bootstrap — Authoritative System Constructor
-
-This file is the ONLY place where global system state is assembled.
 """
 
 from __future__ import annotations
@@ -40,6 +38,7 @@ from embodiment.growth_model import EmbodimentGrowthModel
 # Sensory
 # -------------------------
 from sensory.readiness import SensoryReadiness
+from sensory.wall import SensoryWall
 
 
 # ============================================================
@@ -47,63 +46,43 @@ from sensory.readiness import SensoryReadiness
 # ============================================================
 
 def build_system() -> Tuple[Callable[[], dict], dict]:
-    """
-    Construct the full A7DO system.
-    """
 
     state: Dict[str, Any] = {
-        # -----------------
-        # Time
-        # -----------------
         "ticks": 0,
 
-        # -----------------
-        # Core runtime
-        # -----------------
+        # Core
         "frames": FrameStore(),
         "memory": StructuralMemory(),
         "gate_engine": GateEngine(),
 
-        # -----------------
-        # Womb & gestation
-        # -----------------
+        # Gestation
         "womb_engine": WombPhysicsEngine(),
         "umbilical_link": UmbilicalLink(),
 
-        # -----------------
-        # Embodiment (BIOLOGICAL)
-        # -----------------
+        # Embodiment
         "anatomy": create_default_anatomy(),
         "embodiment_growth": EmbodimentGrowthModel(),
         "embodiment_ledger": EmbodimentLedger(),
 
-        # -----------------
-        # Scuttling (POST-BIRTH)
-        # -----------------
+        # Sensory
+        "sensory_readiness": SensoryReadiness(),
+        "sensory_wall": SensoryWall(),
+        "last_sensory_packets": [],
+
+        # Scuttling
         "scuttling_engine": ScuttlingEngine(),
 
-        # -----------------
-        # Sensory (POST-BIRTH)
-        # -----------------
-        "sensory_readiness": SensoryReadiness(),
-
-        # -----------------
-        # Birth (authoritative)
-        # -----------------
+        # Birth
         "birth_criteria": BirthCriteria(),
         "birth_transition": BirthTransitionEngine(),
         "birth_state": None,
 
-        # -----------------
-        # Structural metrics
-        # -----------------
+        # Metrics
         "last_coherence": 0.0,
         "last_fragmentation": 0.0,
         "structural_load": 0.0,
 
-        # -----------------
-        # Development trace (observer only)
-        # -----------------
+        # Trace
         "development_trace": {
             "ticks": [],
             "heartbeat": [],
@@ -116,9 +95,6 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
             "rhythmic_coupling": [],
         },
 
-        # -----------------
-        # Cached snapshots
-        # -----------------
         "last_womb_state": None,
         "last_umbilical_state": None,
     }
@@ -130,55 +106,15 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
 
 
 # ============================================================
-# SNAPSHOT (READ-ONLY, UI SAFE)
+# SNAPSHOT
 # ============================================================
 
 def system_snapshot(state: dict) -> dict:
     frames = state["frames"]
 
-    coherence = float(state.get("last_coherence", 0.0))
-    fragmentation = float(state.get("last_fragmentation", 0.0))
-    load = float(state.get("structural_load", 0.0))
+    coherence = float(state["last_coherence"])
+    load = float(state["structural_load"])
     stability = coherence * (1.0 - load)
-
-    # Gates
-    gates = {}
-    ge = state.get("gate_engine")
-    if ge:
-        try:
-            snap = ge.snapshot()
-            for name, g in snap.gates.items():
-                gates[name] = g
-        except Exception:
-            pass
-
-    # Embodiment summary
-    embodiment = None
-    try:
-        embodiment = summarize_embodiment(state["embodiment_ledger"])
-    except Exception:
-        pass
-
-    # Womb snapshot
-    womb = None
-    ws = state.get("last_womb_state")
-    if ws:
-        womb = {
-            "heartbeat_rate": ws.heartbeat_rate,
-            "ambient_load": ws.ambient_load,
-            "rhythmic_stability": ws.rhythmic_stability,
-            "womb_active": ws.womb_active,
-        }
-
-    # Umbilical snapshot
-    umbilical = None
-    us = state.get("last_umbilical_state")
-    if us:
-        umbilical = {
-            "active": us.active,
-            "load_transfer": us.load_transfer,
-            "rhythmic_coupling": us.rhythmic_coupling,
-        }
 
     return {
         "ticks": state["ticks"],
@@ -186,15 +122,12 @@ def system_snapshot(state: dict) -> dict:
             "Coherence": coherence,
             "Stability": stability,
             "Load": load,
-            "Z": fragmentation,
+            "Z": state["last_fragmentation"],
         },
         "active_frame": frames.active,
         "memory_count": state["memory"].count(),
-        "gates": gates,
+        "gates": state["gate_engine"].snapshot().gates,
         "anatomy": anatomy_snapshot(state["anatomy"]),
-        "embodiment": embodiment,
-        "womb": womb,
-        "umbilical": umbilical,
         "sensory": state["sensory_readiness"].snapshot(),
         "birth": (
             {
