@@ -4,9 +4,9 @@ CoupledRegion
 
 Local embodied region used by scuttling and reflex coupling.
 
-This file intentionally exposes BOTH:
-- flat attributes (load, pain, thermal)
-- a `.state` view for graph compatibility
+Exposes:
+- flat embodied signals
+- a `.state` view compatible with CouplingGraph
 """
 
 from __future__ import annotations
@@ -24,18 +24,23 @@ class RegionState:
     pain: float = 0.0
     thermal: float = 0.0
     contact: bool = False
+    stability: float = 1.0  # ✅ REQUIRED BY graph
+
+
+def _clamp01(x: float) -> float:
+    return max(0.0, min(1.0, x))
 
 
 @dataclass
 class CoupledRegion:
     """
-    A minimal local coupling region.
+    Minimal embodied coupling region.
     """
 
     name: str
 
     # -------------------------
-    # Local embodied signals
+    # Embodied signals
     # -------------------------
     load: float = 0.0
     pain: float = 0.0
@@ -60,12 +65,16 @@ class CoupledRegion:
 
     def _sync_state(self) -> None:
         """
-        Keep state view consistent with flat attributes.
+        Keep RegionState consistent with embodied signals.
         """
         self.state.load = self.load
         self.state.pain = self.pain
         self.state.thermal = self.thermal
         self.state.contact = self.contact
+
+        # Derived stability (conservative)
+        stress = self.load + self.pain + self.thermal
+        self.state.stability = _clamp01(1.0 - stress)
 
     # --------------------------------------------------
     # Signal update
@@ -100,12 +109,12 @@ class CoupledRegion:
         self.load = max(0.0, self.load - r)
         self.pain = max(0.0, self.pain - r)
         self.thermal = max(0.0, self.thermal - r)
-
         self.contact = False
+
         self._sync_state()
 
     # --------------------------------------------------
-    # Coupling management
+    # Coupling
     # --------------------------------------------------
 
     def couple_to(self, other: "CoupledRegion", strength: float = 1.0) -> None:
@@ -139,6 +148,7 @@ class CoupledRegion:
             "pain": self.pain,
             "thermal": self.thermal,
             "contact": self.contact,
+            "stability": self.state.stability,
             "neighbours": list(self.neighbours),
             "coupling_strength": dict(self.coupling_strength),
         }
