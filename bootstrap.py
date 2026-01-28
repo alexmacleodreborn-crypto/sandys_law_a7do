@@ -19,9 +19,13 @@ from memory.structural_memory import StructuralMemory
 from scuttling.engine import ScuttlingEngine
 
 # -------------------------
+# Gates
+# -------------------------
+from gates.engine import GateEngine
+
+# -------------------------
 # Genesis / embodiment
 # -------------------------
-from scuttling.engine import ScuttlingEngine
 from genesis.womb.physics import WombPhysicsEngine
 from genesis.birth import BirthEvaluator
 
