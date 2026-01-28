@@ -1,4 +1,4 @@
-from sandys_law_a7do.bootstrap import system_snapshot
+from bootstrap import system_snapshot
 
 
 def step_tick(state: dict) -> None:
