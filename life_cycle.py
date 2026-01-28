@@ -1,11 +1,3 @@
-"""
-A7DO Full Life Cycle (Clock-Correct)
-===================================
-
-This LifeCycle DOES NOT own time.
-It delegates to the canonical step_tick().
-"""
-
 from __future__ import annotations
 from enum import Enum
 
@@ -14,30 +6,43 @@ from sandys_law_a7do.world.world_state import make_default_world
 
 
 class LifePhase(Enum):
+    """
+    High-level lifecycle phase.
+    """
     WOMB = "womb"
     BORN = "born"
 
 
 class LifeCycle:
     """
-    High-level lifecycle coordinator.
+    Authoritative lifecycle coordinator.
 
     Responsibilities:
-    - Own TickEngine
-    - Expose phase & born state
-    - Own world instance
+    - Own the TickEngine
+    - Own the physical world instance
+    - Track phase (womb → born)
+    - Expose minimal public state for observers
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
+        # Physical world (external, persistent)
         self.world = make_default_world()
+
+        # Temporal engine (authoritative)
         self.engine = TickEngine()
-        self.phase = LifePhase.WOMB
-        self.born = False
+
+        # Lifecycle flags
+        self.phase: LifePhase = LifePhase.WOMB
+        self.born: bool = False
 
     def tick(self) -> None:
+        """
+        Advance the system by exactly one tick.
+        """
         self.engine.tick()
 
-        birth = self.engine.state.get("birth_state")
-        if birth and birth.born:
+        # Update lifecycle flags deterministically
+        birth_state = self.engine.state.get("birth_state")
+        if birth_state and birth_state.born:
             self.born = True
             self.phase = LifePhase.BORN
