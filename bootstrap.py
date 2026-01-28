@@ -36,7 +36,7 @@ from genesis.birth_state import BirthState
 # -------------------------
 from embodiment.ledger.ledger import EmbodimentLedger
 from embodiment.bridge.accountant import summarize_embodiment
-from embodiment.growth.growth_model import EmbodimentGrowthModel
+from embodiment.growth_model import EmbodimentGrowthModel
 
 
 # ============================================================
