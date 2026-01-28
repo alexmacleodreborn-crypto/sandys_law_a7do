@@ -1,53 +1,77 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
 from world.layouts.town.profile import TownProfile
-from world.layouts.places.core_places import Place
 
+
+# ============================================================
+# ENVIRONMENT CELL
+# ============================================================
 
 @dataclass(frozen=True)
-class EnvironmentSample:
-    temperature: float
-    noise: float
+class EnvironmentCell:
+    temperature: float = 0.0
+    noise: float = 0.0
+    light: float = 0.0
 
+
+# ============================================================
+# WORLD MAP (2D PHYSICAL LAYOUT)
+# ============================================================
 
 class WorldMap:
     """
-    Combines town baseline + local place influence.
+    Physical environment grid.
+    No semantics. No memory. Deterministic.
     """
 
     def __init__(
         self,
         *,
-        town: TownProfile,
-        places: Dict[str, Place],
         width: int,
         height: int,
-    ):
-        self.town = town
-        self.places = places
+        town: TownProfile,
+        cells: Dict[Tuple[int, int], EnvironmentCell],
+    ) -> None:
         self.width = width
         self.height = height
+        self.town = town
+        self._cells = cells
 
-        # Simple deterministic placement
-        self.place_map: Dict[Tuple[int, int], str] = {
-            (5, 5): "home",
-            (2, 2): "hospital",
-            (8, 8): "park",
-        }
+    # --------------------------------------------------------
+    # REQUIRED CONSTRUCTOR ✅
+    # --------------------------------------------------------
 
-    def environment_at(self, x: int, y: int) -> EnvironmentSample:
-        place_name = self.place_map.get((x, y))
-        place = self.places.get(place_name)
+    @classmethod
+    def default(cls, *, width: int, height: int) -> "WorldMap":
+        """
+        Minimal valid world map.
+        Used at birth / Phase 0.
+        """
+        town = TownProfile.default()
 
-        temp = self.town.base_temperature
-        noise = self.town.base_noise
+        cells: Dict[Tuple[int, int], EnvironmentCell] = {}
 
-        if place:
-            temp += place.temperature_offset
-            noise += place.noise_level
+        for x in range(width):
+            for y in range(height):
+                cells[(x, y)] = EnvironmentCell(
+                    temperature=town.base_temperature,
+                    noise=0.0,
+                    light=0.0,
+                )
 
-        return EnvironmentSample(
-            temperature=round(temp, 3),
-            noise=round(noise, 3),
+        return cls(
+            width=width,
+            height=height,
+            town=town,
+            cells=cells,
         )
+
+    # --------------------------------------------------------
+    # ENVIRONMENT ACCESS
+    # --------------------------------------------------------
+
+    def environment_at(self, x: int, y: int) -> EnvironmentCell:
+        return self._cells.get((x, y), EnvironmentCell())
