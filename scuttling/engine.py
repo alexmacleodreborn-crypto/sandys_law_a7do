@@ -34,13 +34,19 @@ class ScuttlingEngine:
             support=self._support,
         )
 
-    def candidates_snapshot(self):
-        return [
-            {
-                "kind": c.kind,
-                "regions": list(c.regions),
-                "support": c.support,
-                "stability": round(c.stability, 3),
-            }
-            for c in self._candidates
-        ]
+   def candidates_snapshot(self):
+    """
+    UI-safe snapshot of scuttling candidates.
+    """
+    if not self._candidates:
+        return []
+
+    return [
+        {
+            "kind": c.kind,
+            "regions": list(c.regions),
+            "support": c.support,
+            "stability": round(c.stability, 3),
+        }
+        for c in self._candidates
+    ]
