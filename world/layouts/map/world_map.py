@@ -1,37 +1,19 @@
-# world/layouts/map/world_map.py
-
 from dataclasses import dataclass
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple
 
 from world.layouts.town.profile import TownProfile
 from world.layouts.places.core_places import Place
 
 
-# ============================================================
-# WORLD MAP (Phase 0)
-# ------------------------------------------------------------
-# A pure spatial field:
-# - deterministic
-# - query-only
-# - no agents
-# - no memory
-# ============================================================
-
-
-@dataclass
-class CellEnvironment:
-    """
-    Environment values at a single coordinate.
-    """
+@dataclass(frozen=True)
+class EnvironmentSample:
     temperature: float
     noise: float
 
 
 class WorldMap:
     """
-    Static 2D spatial map combining:
-    - Town baseline
-    - Place influences
+    Combines town baseline + local place influence.
     """
 
     def __init__(
@@ -41,41 +23,31 @@ class WorldMap:
         places: Dict[str, Place],
         width: int,
         height: int,
-    ) -> None:
+    ):
         self.town = town
         self.places = places
         self.width = width
         self.height = height
 
-    # --------------------------------------------------------
-    # Core query
-    # --------------------------------------------------------
+        # Simple deterministic placement
+        self.place_map: Dict[Tuple[int, int], str] = {
+            (5, 5): "home",
+            (2, 2): "hospital",
+            (8, 8): "park",
+        }
 
-    def environment_at(self, x: int, y: int) -> CellEnvironment:
-        """
-        Return environment values at a grid coordinate.
-        """
+    def environment_at(self, x: int, y: int) -> EnvironmentSample:
+        place_name = self.place_map.get((x, y))
+        place = self.places.get(place_name)
 
-        # Base from town
-        temperature = self.town.base_temperature
+        temp = self.town.base_temperature
         noise = self.town.base_noise
 
-        # Add place influences
-        for place in self.places.values():
-            if self._in_radius(x, y, place):
-                temperature += place.temperature_delta
-                noise += place.noise_delta
+        if place:
+            temp += place.temperature_offset
+            noise += place.noise_level
 
-        return CellEnvironment(
-            temperature=round(temperature, 3),
+        return EnvironmentSample(
+            temperature=round(temp, 3),
             noise=round(noise, 3),
         )
-
-    # --------------------------------------------------------
-    # Helpers
-    # --------------------------------------------------------
-
-    @staticmethod
-    def _in_radius(x: int, y: int, place: Place) -> bool:
-        px, py = place.center
-        return abs(px - x) + abs(py - y) <= place.radius
