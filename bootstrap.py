@@ -1,5 +1,11 @@
 """
 A7DO Bootstrap — Authoritative System Constructor
+
+Responsibilities:
+- Construct system state
+- Own time progression (via tick engine)
+- Expose snapshot() for UI
+- Coordinate prebirth, scuttling, embodiment, birth
 """
 
 from __future__ import annotations
@@ -21,6 +27,7 @@ from gates.engine import GateEngine
 # Genesis / birth
 # -------------------------
 from genesis.womb.physics import WombPhysicsEngine
+from genesis.womb.umbilical import UmbilicalLink
 from genesis.birth.criteria import BirthCriteria
 from genesis.birth.transition import BirthTransitionEngine
 from genesis.birth_state import BirthState
@@ -31,11 +38,6 @@ from genesis.birth_state import BirthState
 from embodiment.ledger.ledger import EmbodimentLedger
 from embodiment.bridge.accountant import summarize_embodiment
 from embodiment.growth_model import EmbodimentGrowthModel
-
-# -------------------------
-# Sensory readiness
-# -------------------------
-from embodiment.sensory.readiness import SensoryReadiness
 
 
 # ============================================================
@@ -64,10 +66,10 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         # Prebirth & embodiment
         # -----------------
         "womb_engine": WombPhysicsEngine(),
+        "umbilical_link": UmbilicalLink(),
         "scuttling_engine": ScuttlingEngine(),
         "embodiment_ledger": EmbodimentLedger(),
         "embodiment_growth": EmbodimentGrowthModel(),
-        "sensory_readiness": SensoryReadiness(),
 
         # -----------------
         # Birth (authoritative)
@@ -84,7 +86,7 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "structural_load": 0.0,
 
         # -----------------
-        # Development trace (visualisation only)
+        # Development trace (VISUALISATION ONLY)
         # -----------------
         "development_trace": {
             "ticks": [],
@@ -94,12 +96,15 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
             "brain_coherence": [],
             "body_growth": [],
             "limb_growth": [],
+            "umbilical_load": [],
+            "rhythmic_coupling": [],
         },
 
         # -----------------
         # Cached views
         # -----------------
         "last_womb_state": None,
+        "last_umbilical_state": None,
     }
 
     def snapshot() -> dict:
@@ -149,6 +154,16 @@ def system_snapshot(state: dict) -> dict:
             "womb_active": ws.womb_active,
         }
 
+    # Umbilical snapshot
+    umbilical = None
+    us = state.get("last_umbilical_state")
+    if us:
+        umbilical = {
+            "active": us.active,
+            "load_transfer": us.load_transfer,
+            "rhythmic_coupling": us.rhythmic_coupling,
+        }
+
     return {
         "ticks": state["ticks"],
         "metrics": {
@@ -162,6 +177,7 @@ def system_snapshot(state: dict) -> dict:
         "gates": gates,
         "embodiment": embodiment,
         "womb": womb,
+        "umbilical": umbilical,
         "birth": (
             {
                 "born": state["birth_state"].born,
@@ -172,5 +188,4 @@ def system_snapshot(state: dict) -> dict:
             else None
         ),
         "scuttling_candidates": state["scuttling_engine"].candidates_snapshot(),
-        "sensory_readiness": state["sensory_readiness"].snapshot(),
     }
