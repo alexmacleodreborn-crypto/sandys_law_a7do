@@ -29,7 +29,7 @@ from gates.engine import GateEngine
 from genesis.womb.physics import WombPhysicsEngine
 from genesis.birth.criteria import BirthCriteria
 from genesis.birth.transition import BirthTransitionEngine
-from genesis.birth import BirthState
+from genesis.birth_state import BirthState
 
 # -------------------------
 # Embodiment
