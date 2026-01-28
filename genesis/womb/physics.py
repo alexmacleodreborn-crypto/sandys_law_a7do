@@ -38,6 +38,10 @@ class WombState:
 class WombPhysicsEngine:
     """
     Generates deterministic womb signals over time.
+
+    IMPORTANT:
+    - This engine owns whether the womb is active.
+    - Tick logic must NEVER mutate WombState flags.
     """
 
     # ---------------------------------
@@ -50,6 +54,7 @@ class WombPhysicsEngine:
 
     def __init__(self) -> None:
         self._tick = 0
+        self.active: bool = True   # 🔑 single source of truth
 
     # ---------------------------------
     # Step
@@ -58,7 +63,18 @@ class WombPhysicsEngine:
     def step(self) -> WombState:
         """
         Advance womb physics by one tick.
+
+        If inactive, returns a frozen, inactive state.
         """
+
+        if not self.active:
+            return WombState(
+                tick=self._tick,
+                heartbeat_rate=0.0,
+                ambient_load=0.0,
+                rhythmic_stability=0.0,
+                womb_active=False,
+            )
 
         self._tick += 1
 
