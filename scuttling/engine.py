@@ -1,6 +1,6 @@
 from embodiment.local.candidates import CandidateBuilder
-from sandys_law_a7do.scuttling.coupling.graph import CouplingGraph
-from sandys_law_a7do.scuttling.coupling.region import CoupledRegion
+from scuttling.coupling.graph import CouplingGraph
+from scuttling.coupling.region import CoupledRegion
 
 
 class ScuttlingEngine:
