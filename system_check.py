@@ -2,26 +2,34 @@
 A7DO System Coherence Check
 ==========================
 
-Verifies:
-- File structure
-- Import wiring
-- Lifecycle readiness
+Structural + wiring pre-flight check.
 
-This does NOT run the system.
+- Verifies file presence
+- Verifies imports
+- Verifies LifeCycle instantiation
+- Verifies Phase-0 world stepping
+
+Does NOT advance time.
+Does NOT mutate long-term state.
 """
 
 import importlib
-import sys
 from pathlib import Path
 
 
+# --------------------------------------------------
+# Required files
+# --------------------------------------------------
+
 REQUIRED_PATHS = [
+    "life_cycle.py",
     "engine/tick_engine.py",
     "genesis/prebirth/phases.py",
     "genesis/birth/criteria.py",
     "genesis/birth/transition.py",
     "square/state.py",
     "world/world_state.py",
+    "world/world_runner.py",
     "frames/store.py",
     "memory/structural_memory.py",
     "accounting/accountant.py",
@@ -37,6 +45,7 @@ REQUIRED_IMPORTS = [
     "genesis.birth.transition",
     "square.state",
     "world.world_state",
+    "world.world_runner",
     "frames.store",
     "memory.structural_memory",
     "accounting.accountant",
@@ -44,11 +53,15 @@ REQUIRED_IMPORTS = [
 ]
 
 
-def check_paths():
+# --------------------------------------------------
+# Checks
+# --------------------------------------------------
+
+def check_paths() -> bool:
     print("🔍 Checking file structure...")
     root = Path(__file__).parent
-
     missing = []
+
     for rel in REQUIRED_PATHS:
         if not (root / rel).exists():
             missing.append(rel)
@@ -63,7 +76,7 @@ def check_paths():
     return True
 
 
-def check_imports():
+def check_imports() -> bool:
     print("🔍 Checking imports...")
     failed = []
 
@@ -83,9 +96,8 @@ def check_imports():
     return True
 
 
-def check_lifecycle_instantiation():
+def check_lifecycle_instantiation() -> bool:
     print("🔍 Checking LifeCycle instantiation...")
-
     try:
         from life_cycle import LifeCycle
         lc = LifeCycle()
@@ -98,20 +110,46 @@ def check_lifecycle_instantiation():
     return True
 
 
-def run_check():
-    print("\n🧠 A7DO SYSTEM CHECK\n" + "=" * 30)
+def check_world_step() -> bool:
+    print("🔍 Checking Phase-0 WorldRunner step...")
+    try:
+        from world.world_state import make_default_world
+        from world.world_runner import WorldRunner
+
+        world = make_default_world()
+        runner = WorldRunner(world)
+        events = runner.step(action=(1, 0))
+
+        assert isinstance(events, list)
+    except Exception as e:
+        print("❌ WorldRunner step failed:")
+        print(f"   {e}")
+        return False
+
+    print("✅ WorldRunner step OK")
+    return True
+
+
+# --------------------------------------------------
+# Run all checks
+# --------------------------------------------------
+
+def run_check() -> bool:
+    print("\n🧠 A7DO SYSTEM CHECK")
+    print("=" * 32)
 
     ok = True
     ok &= check_paths()
     ok &= check_imports()
     ok &= check_lifecycle_instantiation()
+    ok &= check_world_step()
 
     if ok:
         print("\n🎉 SYSTEM CHECK PASSED")
-        print("A7DO is structurally coherent and ready to live.")
+        print("A7DO is structurally coherent and Phase-0 compliant.")
     else:
         print("\n⚠️ SYSTEM CHECK FAILED")
-        print("Fix the issues above before running the life cycle.")
+        print("Fix issues above before running LifeCycle.")
 
     return ok
 
