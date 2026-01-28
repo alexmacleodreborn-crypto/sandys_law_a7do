@@ -3,9 +3,9 @@ A7DO Bootstrap — Authoritative System Constructor
 
 Responsibilities:
 - Construct system state
-- Own time progression
+- Own time progression (via tick engine)
 - Expose snapshot() for UI
-- Coordinate prebirth, scuttling, embodiment, cognition
+- Coordinate prebirth, scuttling, embodiment, birth
 """
 
 from __future__ import annotations
@@ -24,11 +24,16 @@ from scuttling.engine import ScuttlingEngine
 from gates.engine import GateEngine
 
 # -------------------------
-# Genesis / embodiment
+# Genesis / birth
 # -------------------------
 from genesis.womb.physics import WombPhysicsEngine
-from genesis.birth import BirthEvaluator
+from genesis.birth.criteria import BirthCriteria
+from genesis.birth.transition import BirthTransitionEngine
+from genesis.birth import BirthState
 
+# -------------------------
+# Embodiment
+# -------------------------
 from embodiment.ledger.ledger import EmbodimentLedger
 from embodiment.bridge.accountant import summarize_embodiment
 
@@ -67,9 +72,10 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "embodiment_ledger": EmbodimentLedger(),
 
         # -----------------
-        # Birth
+        # Birth (FIXED)
         # -----------------
-        "birth_evaluator": BirthEvaluator(),
+        "birth_criteria": BirthCriteria(),
+        "birth_transition": BirthTransitionEngine(),
         "birth_state": None,
 
         # -----------------
@@ -78,7 +84,6 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "last_coherence": 0.0,
         "last_fragmentation": 0.0,
         "structural_load": 0.0,
-        "prediction_error": 0.0,
 
         # -----------------
         # Cached views
@@ -110,13 +115,8 @@ def system_snapshot(state: dict) -> dict:
     if ge:
         try:
             snap = ge.snapshot()
-            for name, g in (snap.get("gates") or {}).items():
-                gates[name] = {
-                    "state": getattr(g, "state", None),
-                    "open": getattr(g, "open", None),
-                    "reason": getattr(g, "reason", None),
-                    "last_tick": getattr(g, "last_tick", None),
-                }
+            for name, g in (snap.gates or {}).items():
+                gates[name] = g
         except Exception:
             pass
 
@@ -148,7 +148,6 @@ def system_snapshot(state: dict) -> dict:
         },
         "active_frame": frames.active,
         "memory_count": state["memory"].count(),
-        "prediction_error": state.get("prediction_error", 0.0),
         "gates": gates,
         "embodiment": embodiment,
         "womb": womb,
