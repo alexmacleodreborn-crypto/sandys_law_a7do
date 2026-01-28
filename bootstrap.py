@@ -1,45 +1,46 @@
-"""
-A7DO Bootstrap — Authoritative System Constructor
-THIS is the only place global state is assembled.
-"""
-
 from __future__ import annotations
 from typing import Callable, Dict, Any, Tuple
 
-# ------------------------------------------------
+# ---------------------------------------------
 # Core
-# ------------------------------------------------
+# ---------------------------------------------
 from frames.store import FrameStore
 from memory.structural_memory import StructuralMemory
 from gates.engine import GateEngine
 
-# ------------------------------------------------
+# ---------------------------------------------
 # Genesis
-# ------------------------------------------------
+# ---------------------------------------------
 from genesis.womb.physics import WombPhysicsEngine
 from genesis.womb.umbilical import UmbilicalLink
 from genesis.birth.criteria import BirthCriteria
 from genesis.birth.transition import BirthTransitionEngine
 
-# ------------------------------------------------
+# ---------------------------------------------
 # Embodiment
-# ------------------------------------------------
+# ---------------------------------------------
 from embodiment.anatomy import create_default_anatomy, anatomy_snapshot
 from embodiment.growth_model import EmbodimentGrowthModel
 from embodiment.ledger.ledger import EmbodimentLedger
-from embodiment.bridge.accountant import summarize_embodiment
 
-# ------------------------------------------------
-# Sensory / Proto-cognition
-# ------------------------------------------------
+# ---------------------------------------------
+# Sensory / proto-cognition
+# ---------------------------------------------
 from sensory.readiness import SensoryReadiness
 from sensory.wall import SensoryWall
 from square.square import Square
 
-# ------------------------------------------------
-# Scuttling (BODY SCHEMA)
-# ------------------------------------------------
+# ---------------------------------------------
+# Scuttling
+# ---------------------------------------------
 from scuttling.engine import ScuttlingEngine
+
+# ---------------------------------------------
+# WORLD (NEW — REQUIRED)
+# ---------------------------------------------
+from world.world_state import make_default_world
+from world.world_runner import WorldRunner
+from world.sensors import SensorSuite
 
 
 # =================================================
@@ -47,6 +48,8 @@ from scuttling.engine import ScuttlingEngine
 # =================================================
 
 def build_system() -> Tuple[Callable[[], dict], dict]:
+
+    world = make_default_world()
 
     state: Dict[str, Any] = {
 
@@ -58,7 +61,7 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "memory": StructuralMemory(),
         "gate_engine": GateEngine(),
 
-        # Gestation
+        # Genesis
         "womb_engine": WombPhysicsEngine(),
         "umbilical_link": UmbilicalLink(),
 
@@ -67,12 +70,12 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "embodiment_growth": EmbodimentGrowthModel(),
         "embodiment_ledger": EmbodimentLedger(),
 
-        # Sensory & proto-cognition
+        # Sensory
         "sensory_readiness": SensoryReadiness(),
         "sensory_wall": SensoryWall(),
         "square": Square(),
 
-        # ✅ THIS WAS MISSING / BROKEN
+        # Scuttling
         "scuttling_engine": ScuttlingEngine(),
 
         # Birth
@@ -80,12 +83,17 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "birth_transition": BirthTransitionEngine(),
         "birth_state": None,
 
-        # Structural metrics
+        # World (ALWAYS PRESENT)
+        "world": world,
+        "world_runner": WorldRunner(world),
+        "sensor_suite": SensorSuite(world),
+
+        # Metrics
         "last_coherence": 0.0,
         "last_fragmentation": 0.0,
         "structural_load": 0.0,
 
-        # Observer-only trace
+        # Trace
         "development_trace": {
             "ticks": [],
             "heartbeat": [],
@@ -98,7 +106,7 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
             "rhythmic_coupling": [],
         },
 
-        # Cached snapshots
+        # Cached
         "last_womb_state": None,
         "last_umbilical_state": None,
         "last_sensory_packets": [],
@@ -111,7 +119,7 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
 
 
 # =================================================
-# SNAPSHOT (READ-ONLY, UI SAFE)
+# SNAPSHOT
 # =================================================
 
 def system_snapshot(state: dict) -> dict:
@@ -127,8 +135,6 @@ def system_snapshot(state: dict) -> dict:
             "Load": load,
             "Z": state["last_fragmentation"],
         },
-        "memory_count": state["memory"].count(),
-        "gates": state["gate_engine"].snapshot().gates,
         "anatomy": anatomy_snapshot(state["anatomy"]),
         "sensory": state["sensory_readiness"].snapshot(),
         "square": state["square"].snapshot(),
@@ -141,6 +147,6 @@ def system_snapshot(state: dict) -> dict:
             if state["birth_state"]
             else None
         ),
-        # ✅ THIS IS WHY IT WAS CRASHING
         "scuttling_candidates": state["scuttling_engine"].candidates_snapshot(),
+        "world": state["world"].snapshot(),
     }
