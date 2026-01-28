@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from world.layouts.map.world_map import WorldMap
+from layouts.map.world_map import WorldMap
 
 
 class WorldEventType(str, Enum):
