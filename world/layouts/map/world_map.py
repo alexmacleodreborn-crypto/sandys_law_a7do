@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
-from world.layouts.town.profile import TownProfile
-from world.layouts.places.core_places import Place
+from town.profile import TownProfile
+from places.core_places import Place
 
 
 @dataclass(frozen=True)
