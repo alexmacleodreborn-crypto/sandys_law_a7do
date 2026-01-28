@@ -9,8 +9,10 @@ def step_tick(state: dict) -> None:
     - Advance time
     - Run womb physics ONLY pre-birth
     - Accumulate gestation criteria
-    - Run scuttling continuously
     - Execute birth transition exactly once
+    - Freeze womb after birth
+    - Evaluate gates post-birth
+    - Run scuttling continuously
     """
 
     # ------------------------------------------------
@@ -19,7 +21,7 @@ def step_tick(state: dict) -> None:
     state["ticks"] += 1
 
     # ------------------------------------------------
-    # PRE-BIRTH ONLY: WOMB + GESTATION
+    # PRE-BIRTH: WOMB + GESTATION
     # ------------------------------------------------
     if state["birth_state"] is None:
         # ---- Womb physics ----
@@ -40,7 +42,7 @@ def step_tick(state: dict) -> None:
             ambient_load=womb_state.ambient_load,
         )
 
-        # ---- Birth transition check ----
+        # ---- Birth readiness & transition ----
         readiness = criteria.evaluate()
         transition = state["birth_transition"].attempt_transition(
             readiness=readiness,
@@ -56,8 +58,23 @@ def step_tick(state: dict) -> None:
                 tick=state["ticks"],
             )
 
+            # 🔒 FREEZE WOMB FOREVER
+            state["womb_engine"].womb_active = False
+
     # ------------------------------------------------
-    # SCUTTLING (always runs, pre & post birth)
+    # POST-BIRTH: GATE EVALUATION
+    # ------------------------------------------------
+    if state["birth_state"] is not None:
+        gate_engine = state["gate_engine"]
+        gate_engine.evaluate(
+            coherence=state["last_coherence"],
+            fragmentation=state["last_fragmentation"],
+            stability=state["last_coherence"] * (1.0 - state["structural_load"]),
+            load=state["structural_load"],
+        )
+
+    # ------------------------------------------------
+    # SCUTTLING (ALWAYS RUNS)
     # ------------------------------------------------
     scuttling = state["scuttling_engine"]
     scuttling.step()
@@ -67,7 +84,7 @@ class TickEngine:
     """
     Thin adapter around the canonical step_tick().
 
-    This class exists only to provide a stable interface
+    Exists only to provide a stable interface
     for LifeCycle and visualization layers.
     """
 
