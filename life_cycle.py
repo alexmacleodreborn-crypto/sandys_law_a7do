@@ -6,46 +6,38 @@ This LifeCycle DOES NOT own time.
 It delegates to the canonical step_tick().
 """
 
-from engine.tick_engine import TickEngine
+from __future__ import annotations
+from enum import Enum
 
-from world.world_state import make_default_world
-from world.world_runner import WorldRunner
+from sandys_law_a7do.engine.tick_engine import TickEngine
+from sandys_law_a7do.world.world_state import make_default_world
+
+
+class LifePhase(Enum):
+    WOMB = "womb"
+    BORN = "born"
 
 
 class LifeCycle:
     """
-    Observer + coordinator around the real clock.
+    High-level lifecycle coordinator.
+
+    Responsibilities:
+    - Own TickEngine
+    - Expose phase & born state
+    - Own world instance
     """
 
     def __init__(self):
-        # Canonical system state
-        self.engine = TickEngine()
-        self.state = self.engine.snapshot()
-
-        # World (Phase 0)
         self.world = make_default_world()
-        self.world_runner = WorldRunner(self.world)
+        self.engine = TickEngine()
+        self.phase = LifePhase.WOMB
+        self.born = False
 
-    # ----------------------------------------------
-    # ONE HEARTBEAT
-    # ----------------------------------------------
-
-    def tick(self):
-        # Advance canonical system clock
+    def tick(self) -> None:
         self.engine.tick()
 
-        # World physics step (no semantics)
-        self.world_runner.step(action=None)
-
-    # ----------------------------------------------
-    # RUN LOOP
-    # ----------------------------------------------
-
-    def run(self, max_ticks: int | None = None):
-        ticks = 0
-        while True:
-            self.tick()
-            ticks += 1
-
-            if max_ticks is not None and ticks >= max_ticks:
-                break
+        birth = self.engine.state.get("birth_state")
+        if birth and birth.born:
+            self.born = True
+            self.phase = LifePhase.BORN
