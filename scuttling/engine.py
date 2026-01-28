@@ -1,6 +1,6 @@
 from embodiment.local.candidates import CandidateBuilder
-from scuttling.coupling.graph import CouplingGraph
-from scuttling.coupling.region import CoupledRegion
+from .coupling.graph import CouplingGraph
+from .coupling.region import CoupledRegion
 
 
 class ScuttlingEngine:
