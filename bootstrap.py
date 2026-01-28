@@ -14,9 +14,9 @@ from typing import Callable, Dict, Any, Tuple
 # -------------------------
 # Core systems
 # -------------------------
-from sandys_law_a7do.frames.store import FrameStore
-from sandys_law_a7do.memory.structural_memory import StructuralMemory
-from sandys_law_a7do.gates.engine import GateEngine
+from frames.store import FrameStore
+from memory.structural_memory import StructuralMemory
+from scuttling.engine import ScuttlingEngine
 
 # -------------------------
 # Genesis / embodiment
