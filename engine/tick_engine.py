@@ -12,6 +12,7 @@ def step_tick(state: dict) -> None:
     - Delegate embodiment growth computation
     - Execute birth transition exactly once
     - Freeze womb engine AND womb snapshot after birth
+    - Initialise sensory readiness at birth
     - Evaluate gates post-birth
     - Run scuttling continuously
     """
@@ -79,12 +80,39 @@ def step_tick(state: dict) -> None:
                 tick=state["ticks"],
             )
 
-            # Freeze womb engine
+            # 🔒 Freeze womb engine
             state["womb_engine"].womb_active = False
 
-            # Freeze last womb snapshot
+            # 🔒 Freeze last womb snapshot
             if state.get("last_womb_state") is not None:
                 state["last_womb_state"].womb_active = False
+
+            # ------------------------------------------------
+            # INITIAL SENSORY READINESS (POST-BIRTH ONLY)
+            # ------------------------------------------------
+            sr = state["sensory_readiness"]
+
+            # Core: protected, internal only
+            sr.set_region(
+                "core",
+                proprioception=0.2,
+            )
+
+            # First limb: primary contact
+            sr.set_region(
+                "limb_left",
+                touch=0.6,
+                pain=0.8,
+                proprioception=0.5,
+                temperature=0.3,
+            )
+
+            # Second limb: differentiating
+            sr.set_region(
+                "limb_right",
+                touch=0.2,
+                pain=0.4,
+            )
 
     # ------------------------------------------------
     # POST-BIRTH: GATE EVALUATION
