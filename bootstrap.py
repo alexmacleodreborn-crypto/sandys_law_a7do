@@ -36,6 +36,7 @@ from genesis.birth_state import BirthState
 # -------------------------
 from embodiment.ledger.ledger import EmbodimentLedger
 from embodiment.bridge.accountant import summarize_embodiment
+from embodiment.growth.growth_model import EmbodimentGrowthModel
 
 
 # ============================================================
@@ -45,10 +46,6 @@ from embodiment.bridge.accountant import summarize_embodiment
 def build_system() -> Tuple[Callable[[], dict], dict]:
     """
     Construct the full A7DO system.
-
-    Returns:
-        snapshot() -> dict
-        state -> mutable system state
     """
 
     state: Dict[str, Any] = {
@@ -70,6 +67,7 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "womb_engine": WombPhysicsEngine(),
         "scuttling_engine": ScuttlingEngine(),
         "embodiment_ledger": EmbodimentLedger(),
+        "embodiment_growth": EmbodimentGrowthModel(),
 
         # -----------------
         # Birth (authoritative)
@@ -79,7 +77,7 @@ def build_system() -> Tuple[Callable[[], dict], dict]:
         "birth_state": None,
 
         # -----------------
-        # Structural channels (written by tick engine)
+        # Structural channels (written by tick)
         # -----------------
         "last_coherence": 0.0,
         "last_fragmentation": 0.0,
@@ -122,9 +120,7 @@ def system_snapshot(state: dict) -> dict:
     load = float(state.get("structural_load", 0.0))
     stability = coherence * (1.0 - load)
 
-    # -----------------
     # Gates
-    # -----------------
     gates = {}
     ge = state.get("gate_engine")
     if ge:
@@ -135,18 +131,14 @@ def system_snapshot(state: dict) -> dict:
         except Exception:
             pass
 
-    # -----------------
     # Embodiment summary
-    # -----------------
     embodiment = None
     try:
         embodiment = summarize_embodiment(state["embodiment_ledger"])
     except Exception:
         pass
 
-    # -----------------
     # Womb snapshot
-    # -----------------
     womb = None
     ws = state.get("last_womb_state")
     if ws:
