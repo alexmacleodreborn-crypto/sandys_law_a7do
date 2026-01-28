@@ -1,4 +1,4 @@
-from bootstrap import system_snapshot
+from sandys_law_a7do.bootstrap import system_snapshot
 from embodiment.anatomy import grow_anatomy
 from world.world_state import WorldEventType
 
