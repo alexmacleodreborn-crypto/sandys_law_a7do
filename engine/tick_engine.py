@@ -1,7 +1,7 @@
 from bootstrap import system_snapshot
 from embodiment.anatomy import grow_anatomy
 
-from scuttling.reflex import ReflexEngine
+from scuttling.reflex import ReflexBuffer, ReflexCouplingEngine
 from scuttling.reflex_coupling import ReflexCouplingEngine
 from scuttling.reflex_adapter import extract_reflex_triggers
 
