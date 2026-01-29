@@ -22,7 +22,7 @@ from sensory.wall import SensoryWall
 from square.square import Square
 
 from world.world_state import make_default_world
-from world.runner import WorldRunner
+from world.world_runner import WorldRunner
 from world.sensors import SensorSuite
 
 
