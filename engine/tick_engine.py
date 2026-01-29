@@ -1,8 +1,12 @@
 from bootstrap import system_snapshot
 from embodiment.anatomy import grow_anatomy
 
-from scuttling.reflex import ReflexBuffer, ReflexCouplingEngine
-from scuttling.reflex_coupling import ReflexCouplingEngine
+# ✅ Reflex facade ONLY
+from scuttling.reflex import (
+    ReflexEngine,
+    ReflexCouplingEngine,
+)
+
 from scuttling.reflex_adapter import extract_reflex_triggers
 
 
@@ -97,7 +101,7 @@ def step_tick(state: dict) -> None:
         # -----------------------------
         # WORLD STEP (NO ACTION YET)
         # -----------------------------
-        world_events = state["world_runner"].step(action=None)
+        state["world_runner"].step(action=None)
 
         # -----------------------------
         # REFLEXES (FAST, LOCAL)
@@ -144,13 +148,13 @@ def step_tick(state: dict) -> None:
 
         state["last_sensory_packets"] = packets
 
-        # Frames (proto-experience)
+        # Proto-experience
         state["frames"].observe_sensory(packets)
 
-        # Square (repetition)
+        # Repetition
         state["square"].observe_packets(packets)
 
-        # Gates (post-perception)
+        # Gates
         state["gate_engine"].evaluate(
             coherence=state["last_coherence"],
             fragmentation=state["last_fragmentation"],
