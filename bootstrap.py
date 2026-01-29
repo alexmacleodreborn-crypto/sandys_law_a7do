@@ -1,28 +1,32 @@
 from __future__ import annotations
 from typing import Callable, Dict, Any, Tuple
 
-from frames.store import FrameStore
-from memory.structural_memory import StructuralMemory
-from scuttling.engine import ScuttlingEngine
-from gates.engine import GateEngine
+from sandys_law_a7do.frames.store import FrameStore
+from sandys_law_a7do.memory.structural_memory import StructuralMemory
+from sandys_law_a7do.scuttling.engine import ScuttlingEngine
+from sandys_law_a7do.gates.engine import GateEngine
 
-from genesis.womb.physics import WombPhysicsEngine
-from genesis.womb.umbilical import UmbilicalLink
-from genesis.birth.criteria import BirthCriteria
-from genesis.birth.transition import BirthTransitionEngine
+from sandys_law_a7do.genesis.womb.physics import WombPhysicsEngine
+from sandys_law_a7do.genesis.womb.umbilical import UmbilicalLink
+from sandys_law_a7do.genesis.birth.criteria import BirthCriteria
+from sandys_law_a7do.genesis.birth.transition import BirthTransitionEngine
 
-from embodiment.anatomy import create_default_anatomy, anatomy_snapshot
-from embodiment.ledger.ledger import EmbodimentLedger
-from embodiment.bridge.accountant import summarize_embodiment
-from embodiment.growth_model import EmbodimentGrowthModel
+from sandys_law_a7do.embodiment.anatomy import (
+    create_default_anatomy,
+    anatomy_snapshot,
+)
+from sandys_law_a7do.embodiment.ledger.ledger import EmbodimentLedger
+from sandys_law_a7do.embodiment.bridge.accountant import summarize_embodiment
+from sandys_law_a7do.embodiment.growth_model import EmbodimentGrowthModel
 
-from sensory.readiness import SensoryReadiness
-from sensory.wall import SensoryWall
+from sandys_law_a7do.sensory.readiness import SensoryReadiness
+from sandys_law_a7do.sensory.wall import SensoryWall
 
-from square.square import Square
+from sandys_law_a7do.square.square import Square
 
-from world.world_state import make_default_world
-from world.runner import WorldRunner
+from sandys_law_a7do.world.world_state import make_default_world
+from sandys_law_a7do.world.runner import WorldRunner
+from sandys_law_a7do.world.sensors import SensorSuite
 
 
 def build_system() -> Tuple[Callable[[], dict], dict]:
