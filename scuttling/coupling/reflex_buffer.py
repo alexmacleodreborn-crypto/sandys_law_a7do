@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from sandys_law_a7do.scuttling.coupling.reflex_coupling import (
+from scuttling.coupling.reflex_coupling import (
     CoupledReflexOutcome,
 )
 
