@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Optional
 
-from sandys_law_a7do.scuttling.reflex import ReflexResult, ReflexAction
+from scuttling.reflex import ReflexResult, ReflexAction
 
 
 # ============================================================
