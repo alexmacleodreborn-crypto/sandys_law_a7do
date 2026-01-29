@@ -1,27 +1,43 @@
+from __future__ import annotations
+
 from bootstrap import system_snapshot
 from embodiment.anatomy import grow_anatomy
 
-# ✅ Reflex facade ONLY
-from scuttling.reflex import (
-    ReflexEngine,
-    ReflexCouplingEngine,
-)
-
+# ----------------------------
+# Reflex layer (CORRECT)
+# ----------------------------
+from scuttling.reflex import ReflexEngine
+from scuttling.coupling.reflex_buffer import ReflexBuffer
+from scuttling.coupling.reflex_coupling import ReflexCouplingEngine
 from scuttling.reflex_adapter import extract_reflex_triggers
 
+
+# ============================================================
+# CANONICAL TICK
+# ============================================================
 
 def step_tick(state: dict) -> None:
     """
     THE ONLY CLOCK IN THE SYSTEM
+
+    Ordering is biologically strict:
+    1. Gestation (pre-birth)
+    2. Birth transition
+    3. World physics
+    4. Reflexes (fast, local)
+    5. Sensory wall
+    6. Proto-cognition (frames, square)
+    7. Gates
+    8. Scuttling (always)
     """
 
-    # =================================================
+    # ------------------------------------------------
     # TIME
-    # =================================================
+    # ------------------------------------------------
     state["ticks"] += 1
 
     # =================================================
-    # PRE-BIRTH (GESTATION)
+    # PRE-BIRTH — GESTATION ONLY
     # =================================================
     if state["birth_state"] is None:
         womb = state["womb_engine"]
@@ -39,7 +55,7 @@ def step_tick(state: dict) -> None:
         )
         state["last_fragmentation"] = 1.0 - womb_state.rhythmic_stability
 
-        # Gestation criteria
+        # Birth criteria
         criteria = state["birth_criteria"]
         criteria.update(
             dt=1.0,
@@ -47,13 +63,13 @@ def step_tick(state: dict) -> None:
             ambient_load=womb_state.ambient_load,
         )
 
-        # Anatomical growth
+        # Physical body growth
         grow_anatomy(
             anatomy=state["anatomy"],
             stability=womb_state.rhythmic_stability,
         )
 
-        # Observer trace
+        # Observer trace (visual only)
         trace = state["development_trace"]
         trace["ticks"].append(state["ticks"])
         trace["heartbeat"].append(womb_state.heartbeat_rate)
@@ -94,80 +110,90 @@ def step_tick(state: dict) -> None:
             womb_state.womb_active = False
             umb_state.active = False
 
+        return  # NOTHING post-birth runs yet
+
     # =================================================
-    # POST-BIRTH (REFLEX → SENSORY → PROTO-COGNITION)
+    # POST-BIRTH — WORLD → REFLEX → SENSORY → COGNITION
     # =================================================
-    if state["birth_state"] is not None:
-        # -----------------------------
-        # WORLD STEP (NO ACTION YET)
-        # -----------------------------
-        state["world_runner"].step(action=None)
 
-        # -----------------------------
-        # REFLEXES (FAST, LOCAL)
-        # -----------------------------
-        reflex_engine = ReflexEngine()
-        coupling = ReflexCouplingEngine()
+    # -----------------------------
+    # World physics (no intent yet)
+    # -----------------------------
+    state["world_runner"].step(action=None)
 
-        triggers = extract_reflex_triggers(state["world"])
-        results = [
-            reflex_engine.evaluate(
-                trigger=t,
-                current_load=state["structural_load"],
-                current_stability=state["last_coherence"],
-            )
-            for t in triggers
-        ]
+    # -----------------------------
+    # Reflexes (fast, local, non-cognitive)
+    # -----------------------------
+    reflex_engine = ReflexEngine()
+    reflex_buffer: ReflexBuffer = state["reflex_buffer"]
+    reflex_coupler = ReflexCouplingEngine()
 
-        outcome = coupling.couple(results=results)
+    triggers = extract_reflex_triggers(state["world"])
 
-        if outcome.triggered:
-            state["structural_load"] = max(
-                0.0, state["structural_load"] + outcome.net_load_delta
-            )
-            state["last_coherence"] = min(
-                1.0, state["last_coherence"] + outcome.net_stability_delta
-            )
+    for t in triggers:
+        result = reflex_engine.evaluate(
+            trigger=t,
+            current_load=state["structural_load"],
+            current_stability=state["last_coherence"],
+        )
+        reflex_buffer.push(result)
 
-        # -----------------------------
-        # SENSORY READINESS
-        # -----------------------------
-        state["sensory_readiness"].step(born=True)
+    outcome = reflex_coupler.couple(
+        results=reflex_buffer.flush()
+    )
 
-        raw_input = {
-            "vision": 0.05,
-            "sound": 0.1,
-            "touch": 0.05,
-        }
-
-        packets = state["sensory_wall"].filter(
-            raw_input=raw_input,
-            anatomy=state["anatomy"],
-            sensory_levels=state["sensory_readiness"].snapshot(),
+    if outcome.triggered:
+        state["structural_load"] = max(
+            0.0, state["structural_load"] + outcome.net_load_delta
+        )
+        state["last_coherence"] = min(
+            1.0, state["last_coherence"] + outcome.net_stability_delta
         )
 
-        state["last_sensory_packets"] = packets
+    # -----------------------------
+    # Sensory readiness ramp
+    # -----------------------------
+    state["sensory_readiness"].step(born=True)
 
-        # Proto-experience
-        state["frames"].observe_sensory(packets)
+    raw_input = {
+        "vision": 0.05,   # light/shadow
+        "sound": 0.10,    # muffled noise
+        "touch": 0.05,    # diffuse contact
+    }
 
-        # Repetition
-        state["square"].observe_packets(packets)
+    packets = state["sensory_wall"].filter(
+        raw_input=raw_input,
+        anatomy=state["anatomy"],
+        sensory_levels=state["sensory_readiness"].snapshot(),
+    )
 
-        # Gates
-        state["gate_engine"].evaluate(
-            coherence=state["last_coherence"],
-            fragmentation=state["last_fragmentation"],
-            stability=state["last_coherence"]
-            * (1.0 - state["structural_load"]),
-            load=state["structural_load"],
-        )
+    state["last_sensory_packets"] = packets
 
-    # =================================================
-    # SCUTTLING (ALWAYS)
-    # =================================================
+    # -----------------------------
+    # Proto-cognition
+    # -----------------------------
+    state["frames"].observe_sensory(packets)
+    state["square"].observe_packets(packets)
+
+    # -----------------------------
+    # Gates (AFTER perception)
+    # -----------------------------
+    state["gate_engine"].evaluate(
+        coherence=state["last_coherence"],
+        fragmentation=state["last_fragmentation"],
+        stability=state["last_coherence"] * (1.0 - state["structural_load"]),
+        load=state["structural_load"],
+    )
+
+    # -----------------------------
+    # Scuttling always runs
+    # -----------------------------
     state["scuttling_engine"].step()
 
+
+# ============================================================
+# ENGINE WRAPPER
+# ============================================================
 
 class TickEngine:
     def __init__(self, state: dict | None = None):
